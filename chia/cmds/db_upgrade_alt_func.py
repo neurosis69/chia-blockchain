@@ -1,7 +1,7 @@
 from typing import Dict, Optional
 from pathlib import Path
 import sys
-from os import remove
+from os import remove, path
 from time import time
 
 from psutil import virtual_memory, disk_usage
@@ -37,8 +37,10 @@ def db_upgrade_alt_func(
     config: Dict
     selected_network: str
     db_pattern: str
+    sub_epoch_db_path: Path
+
+    config = load_config(root_path, "config.yaml")["full_node"]
     if in_db_path is None or out_db_path is None:
-        config = load_config(root_path, "config.yaml")["full_node"]
         selected_network = config["selected_network"]
         db_pattern = config["database_path"]
 
@@ -46,11 +48,14 @@ def db_upgrade_alt_func(
     if in_db_path is None:
         db_path_replaced = db_pattern.replace("CHALLENGE", selected_network)
         in_db_path = path_from_root(root_path, db_path_replaced)
-        print(f"{in_db_path}")
 
+    if out_db_path is not None:
+        sub_epoch_db_path = path_from_root(Path(out_db_path), "sub_epoch_segments_v3.sqlite") 
+        
     if out_db_path is None:
         db_path_replaced = db_pattern.replace("CHALLENGE", selected_network).replace("_v1_", "_v2_")
         out_db_path = path_from_root(root_path, db_path_replaced)
+        sub_epoch_db_path = path_from_root(Path(out_db_path).parent, "sub_epoch_segments_v3.sqlite")
         mkdir(out_db_path.parent)
 
     if check_only:
@@ -58,13 +63,12 @@ def db_upgrade_alt_func(
     else:
         # Commented out to save time during tests
         # check_db(in_db_path, temp_store_path, hdd, check_only)
-        convert_v1_to_v2(in_db_path, out_db_path, offline, hdd, temp_store_path, check_only)
+        convert_v1_to_v2(in_db_path, out_db_path, sub_epoch_db_path, offline, hdd, temp_store_path, check_only)
 
     if update_config and not check_only:
         print("updating config.yaml")
-        config = load_config(root_path, "config.yaml")
         new_db_path = db_pattern.replace("_v1_", "_v2_")
-        config["full_node"]["database_path"] = new_db_path
+        config["database_path"] = new_db_path
         print(f"database_path: {new_db_path}")
         save_config(root_path, "config.yaml", config)
 
@@ -149,6 +153,7 @@ def connect_to_db(
     mmap_size: int,
     offline: Optional[bool],
     temp_store_path: Optional[Path],
+    page_size: Optional[int],
 ):
     db = sqlite3.connect(open_in_path)
     cursor = db.cursor()
@@ -177,11 +182,12 @@ def connect_to_db(
 
     # CHANGE PAGE_SIZE
     # comment this block if you don't want to change page size
-    # if not path.exists(attach_out_path):
-    #    init_pagesize = sqlite3.connect(attach_out_path)
-    #    init_pagesize.execute("PRAGMA PAGE_SIZE=8192")
-    #    init_pagesize.execute("VACUUM")
-    #    init_pagesize.close()
+    if not path.exists(attach_out_path):
+        init_pagesize = sqlite3.connect(attach_out_path)
+        #init_pagesize.execute("PRAGMA PAGE_SIZE=?", (str(page_size),))
+        init_pagesize.execute("PRAGMA PAGE_SIZE=" + (str(page_size)))
+        init_pagesize.execute("VACUUM")
+        init_pagesize.close()
 
     db.execute("ATTACH DATABASE ? AS v2db", (str(attach_out_path),))
     # Set parameter for attached database only
@@ -193,8 +199,12 @@ def connect_to_db(
 
 
 def convert_v1_to_v2(
-    in_path: Path, out_path: Path, offline: bool, hdd: bool, temp_store_path: Optional[Path], check_only: bool
+        in_path: Path, out_path: Path, sub_epoch_db_file: Path, offline: bool, hdd: bool, temp_store_path: Optional[Path], check_only: bool
 ) -> None:
+
+    # Page Size Default is 4096
+    db_page_size_main = 4096
+    db_page_size_sub_epoch = 65536
 
     if out_path.exists():
         print(f"output file already exists. {out_path}")
@@ -231,9 +241,9 @@ def convert_v1_to_v2(
     # HINT_SHRINK_RATE = HINT_COMMIT_RATE * 1.5
 
     print(f"\n\nopening file for reading: {in_path}")
-    in_db = connect_to_db(in_path, out_path, mmap_size, offline, temp_store_path)
+    in_db = connect_to_db(in_path, out_path, mmap_size, offline, temp_store_path, db_page_size_main)
 
-    print("\n[0/9] initializing v2 database with current_peak")
+    print("\n[0/8] initializing v2 database with current_peak")
 
     # CURRENT_PEAK START
     # The table current_peak would probably benefit from a without rowid implementation
@@ -269,6 +279,7 @@ def convert_v1_to_v2(
 
     # CURRENT_PEAK END
 
+    # Create v2 Tables in main sqlite file
     print("\tcreating v2 database tables")
 
     in_db.execute(
@@ -285,12 +296,6 @@ def convert_v1_to_v2(
     )
 
     in_db.execute(
-        "CREATE TABLE IF NOT EXISTS v2db.sub_epoch_segments_v3("
-        "ses_block_hash blob PRIMARY KEY,"
-        "challenge_segments blob)"
-    )
-
-    in_db.execute(
         "CREATE TABLE IF NOT EXISTS v2db.coin_record("
         "coin_name blob PRIMARY KEY,"
         "confirmed_index bigint,"
@@ -303,15 +308,27 @@ def convert_v1_to_v2(
     )
 
     in_db.execute("CREATE TABLE IF NOT EXISTS v2db.hints(coin_id blob, hint blob, UNIQUE (coin_id, hint))")
+    in_db.close()
+
+    # Create v2 Table in sub epoch sqlite file
+    ses_db = connect_to_db(in_path, sub_epoch_db_file, mmap_size, offline, temp_store_path, db_page_size_sub_epoch)
+
+    ses_db.execute(
+        "CREATE TABLE IF NOT EXISTS v2db.sub_epoch_segments_v3("
+        "ses_block_hash blob PRIMARY KEY,"
+        "challenge_segments blob)"
+    )
+    ses_db.close()
 
     # Create v2 Tables END
 
     # Start Data Migration
+    in_db = connect_to_db(in_path, out_path, mmap_size, offline, temp_store_path, db_page_size_main)
 
     # FULL BLOCKS/BLOCK_RECORDS
     # Source Table is ~19 GB/ Source Tables is ~1.3 GB
 
-    print("\n[1/9] converting full_blocks")
+    print("\n[1/8] converting full_blocks")
 
     # Cache Size of 1G to write to attached db
     in_db.execute("pragma v2db.cache_size=-524288")
@@ -474,7 +491,7 @@ def convert_v1_to_v2(
     print(f"\n\tOverall Time: {full_blocks_end_time - block_start_time:.2f} seconds")
 
     # INDEXES BLOCK STORE START
-    print("\n[2/9] recreating block store indexes")
+    print("\n[2/8] recreating block store indexes")
     # Found out having best performance on index rebuild using small cache size
     in_db.execute("pragma v2db.cache_size=-2000")
 
@@ -513,11 +530,11 @@ def convert_v1_to_v2(
         temp2_out_path = temp_store_path / "temp_coin_store.sqlite"
     else:
         temp2_out_path = out_path.parent / "temp_coin_store.sqlite"
-    temp2_db = connect_to_db(in_path, temp2_out_path, mmap_size, offline, temp_store_path)
+    temp2_db = connect_to_db(in_path, temp2_out_path, mmap_size, offline, temp_store_path, db_page_size_main)
 
     # COIN_RECORD
     # Source Table is ~9.5G
-    print("\n[3/9] converting coin_store")
+    print("\n[3/8] converting coin_store")
 
     temp2_db.execute("pragma v2db.cache_size=-524288")
 
@@ -633,19 +650,20 @@ def convert_v1_to_v2(
     ###############
 
     # Again recoonnect to get benefit of mmap
-    if temp_store_path is not None:
-        temp3_out_path = temp_store_path / "temp_sub_epoch.sqlite"
-    else:
-        temp3_out_path = out_path.parent / "temp_sub_epoch.sqlite"
-    temp3_db = connect_to_db(in_path, temp3_out_path, mmap_size, offline, temp_store_path)
+#    if temp_store_path is not None:
+#        temp3_out_path = temp_store_path / "temp_sub_epoch.sqlite"
+#    else:
+#        temp3_out_path = out_path.parent / "temp_sub_epoch.sqlite"
+    ses_db = connect_to_db(in_path, sub_epoch_db_file, mmap_size, offline, temp_store_path, db_page_size_sub_epoch)
 
     # SUB_EPOCH_SEGMENTS_V3
     # Source Table is 2.4G
-    print("\n[4/9] converting sub_epoch_segments_v3")
+    print("\n[4/8] converting sub_epoch_segments_v3")
+    print(f"\twriting table to separate db file: {sub_epoch_db_file}")
 
     # Sub Epoch table also benefits when using cache size on source db file
-    temp3_db.execute("pragma main.cache_size=-102400")
-    temp3_db.execute("pragma v2db.cache_size=-102400")
+    ses_db.execute("pragma main.cache_size=-102400")
+    ses_db.execute("pragma v2db.cache_size=-102400")
 
     ses_values = []
     ses_start_time = time()
@@ -656,17 +674,17 @@ def convert_v1_to_v2(
     print(f"\tSub Epoch Commit Rate: {SES_COMMIT_RATE} blocks")
 
     # Sub Epoch Table in temp db file
-    temp3_db.execute(
-        "CREATE TABLE IF NOT EXISTS v2db.sub_epoch_segments_v3(" "ses_block_hash blob," "challenge_segments blob)"
-    )
+    #ses_db.execute(
+    #    "CREATE TABLE IF NOT EXISTS v2db.sub_epoch_segments_v3(" "ses_block_hash blob," "challenge_segments blob)"
+    #)
 
-    cursor = temp3_db.cursor()
-    cursor.execute("SELECT ses_block_hash, challenge_segments FROM main.sub_epoch_segments_v3")
+    cursor = ses_db.cursor()
+    cursor.execute("SELECT ses_block_hash, challenge_segments FROM main.sub_epoch_segments_v3 ORDER BY ses_block_hash")
 
     # DATA MIGRATION
 
     count = 0
-    temp3_db.execute("BEGIN TRANSACTION")
+    ses_db.execute("BEGIN TRANSACTION")
     while True:
         rows = cursor.fetchmany(SES_COMMIT_RATE)
         if not rows:
@@ -686,22 +704,22 @@ def convert_v1_to_v2(
             commit_in -= 1
             if commit_in == 0:
                 commit_in = SES_COMMIT_RATE
-                temp3_db.executemany("INSERT INTO v2db.sub_epoch_segments_v3 VALUES (?, ?)", ses_values)
-                temp3_db.commit()
-                temp3_db.execute("BEGIN TRANSACTION")
+                ses_db.executemany("INSERT INTO v2db.sub_epoch_segments_v3 VALUES (?, ?)", ses_values)
+                ses_db.commit()
+                ses_db.execute("BEGIN TRANSACTION")
                 ses_values = []
     #        shrink_in -= 1
     #        if shrink_in <= 0:
     #            shrink_in = SES_COMMIT_RATE
-    #            temp3_db.execute("PRAGMA shrink_memory")
+    #            ses_db.execute("PRAGMA shrink_memory")
 
-    temp3_db.executemany("INSERT INTO v2db.sub_epoch_segments_v3 VALUES (?, ?)", ses_values)
-    temp3_db.commit()
+    ses_db.executemany("INSERT INTO v2db.sub_epoch_segments_v3 VALUES (?, ?)", ses_values)
+    ses_db.commit()
     cursor.close()
     end_time = time()
     print(f"\tOverall Time: {end_time - ses_start_time:.2f} seconds")
 
-    temp3_db.close()
+    ses_db.close()
     ###############
 
     # At this point, data conversion is finished
@@ -710,8 +728,8 @@ def convert_v1_to_v2(
     # and will be migrated to target db file now
     print(f"\nstarting migration to final db file: {out_path}")
 
-    print("\n[5/9] migrating temp table coin_record")
-    in_db = connect_to_db(temp2_out_path, out_path, mmap_size, True, temp_store_path)
+    print("\n[5/8] migrating temp table coin_record")
+    in_db = connect_to_db(temp2_out_path, out_path, mmap_size, True, temp_store_path, db_page_size_main)
 
     # Setting explicitly lower cache_spill to prevent to much memory usage
     # Be aware that these settings should all lead to a max use of 4G memory,
@@ -730,7 +748,7 @@ def convert_v1_to_v2(
     # COIN_RECORD END
 
     # INDEXES
-    print("\n[6/9] Recreating coin store indexes")
+    print("\n[6/8] Recreating coin store indexes")
     in_db.execute("pragma v2db.cache_size=-2000")
 
     # 1. INDEX
@@ -768,30 +786,10 @@ def convert_v1_to_v2(
     remove(temp2_out_path)
     ############
 
-    print("\n[7/9] migrating temp table sub_epoch_segments_v3")
-    in_db = connect_to_db(temp3_out_path, out_path, mmap_size, True, temp_store_path)
-
-    in_db.execute("pragma v2db.cache_spill=100000")
-    in_db.execute("pragma v2db.cache_size=-102400")
-    in_db.execute("pragma main.cache_size=-102400")
-
-    # SUB_EPOCH_SEGMENTS_V3 START
-    reorg_start = time()
-    in_db.execute("BEGIN TRANSACTION")
-    in_db.execute("INSERT INTO v2db.sub_epoch_segments_v3 SELECT * from main.sub_epoch_segments_v3")
-    reorg_end = time()
-    print(f"\tMigrate sub_epoch_segments_v3: {reorg_end - reorg_start:.2f} seconds                             ")
-    in_db.commit()
-    # SUB_EPOCH_SEGMENTS_V3 END
-
-    in_db.close()
-    remove(temp3_out_path)
-    ############
-
     # HINTS
     # Source Table is 40M
-    print("\n[8/9] converting hint_store")
-    in_db = connect_to_db(in_path, out_path, mmap_size, offline, temp_store_path)
+    print("\n[7/8] converting hint_store")
+    in_db = connect_to_db(in_path, out_path, mmap_size, offline, temp_store_path, db_page_size_main)
 
     in_db.execute("pragma v2db.cache_size=-524288")
 
@@ -834,7 +832,7 @@ def convert_v1_to_v2(
     print(f"\tOverall Time: {end_time - hint_start_time:.2f} seconds                             ")
 
     # INDEXES
-    print("\n[9/9] recreating hints indexes")
+    print("\n[8/8] recreating hints indexes")
 
     in_db.execute("pragma v2db.cache_size=-2000")
 
