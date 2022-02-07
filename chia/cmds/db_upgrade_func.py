@@ -45,7 +45,7 @@ def db_upgrade_func(
         out_db_path = path_from_root(root_path, db_path_replaced)
         mkdir(out_db_path.parent)
 
-    asyncio.run(convert_v1_to_v2(in_db_path, out_db_path))
+    #asyncio.run(convert_v1_to_v2(in_db_path, out_db_path))
 
     if update_config:
         print("updating config.yaml")
