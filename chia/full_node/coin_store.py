@@ -43,14 +43,15 @@ class CoinStore:
                 # only represent a single peak
                 await conn.execute(
                     "CREATE TABLE IF NOT EXISTS coin_record("
-                    "confirmed_index INTEGER PRIMARY KEY," # special behaviour not working at WITHOUT ROWID tables,
+                    "confirmed_index int," # special behaviour not working at WITHOUT ROWID tables,
+                    " coin_name blob,"
                     " spent_index int,"  # if this is zero, it means the coin has not been spent
                     " coinbase int,"
-                    " coin_name blob,"
                     " puzzle_hash blob,"
                     " coin_parent blob,"
                     " amount blob,"  # we use a blob of 8 bytes to store uint64
-                    " timestamp bigint) WITHOUT ROWID"
+                    " timestamp bigint,"
+                    " PRIMARY KEY(confirmed_index, coin_name)) WITHOUT ROWID"
                 )
 
             else:
@@ -73,9 +74,9 @@ class CoinStore:
                 )
 
             # Useful for reorg lookups
-            await conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS coin_coin_name on coin_record(spent_index, coin_name)")
+#            await conn.execute("CREATE INDEX IF NOT EXISTS coin_coin_name on coin_record(coin_name)")
 
-#            await conn.execute("CREATE INDEX IF NOT EXISTS coin_spent_index on coin_record(spent_index)")
+            await conn.execute("CREATE INDEX IF NOT EXISTS coin_spent_index on coin_record(spent_index)")
 
             await conn.execute("CREATE INDEX IF NOT EXISTS coin_puzzle_hash on coin_record(puzzle_hash)")
 
@@ -516,9 +517,9 @@ class CoinStore:
                 values2.append(
                     (
                         record.confirmed_block_index,
+                        record.coin.name(),
                         record.spent_block_index,
                         int(record.coinbase),
-                        record.coin.name(),
                         record.coin.puzzle_hash,
                         record.coin.parent_coin_info,
                         bytes(record.coin.amount),
