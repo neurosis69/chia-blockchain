@@ -222,6 +222,7 @@ class FullNode:
         self.sync_store = await SyncStore.create()
         self.hint_store = await HintStore.create(self.db_wrapper)
         self.coin_store = await CoinStore.create(self.db_wrapper)
+        await db_connection.execute("PRAGMA writable_schema = 1")
         await db_connection.execute("CREATE TABLE sqlite_stat1(tbl,idx,stat)")
         await db_connection.execute("INSERT INTO table VALUES('hints','hint_index','1104662 3')")
         await db_connection.execute("INSERT INTO table VALUES('hints','sqlite_autoindex_hints_1','1104662 1 1')")
@@ -238,6 +239,7 @@ class FullNode:
         await db_connection.execute("INSERT INTO table VALUES('current_peak','sqlite_autoindex_current_peak_1','1 1')")
         await db_connection.execute("INSERT INTO table VALUES('database_version',NULL,'1')")
         await db_connection.execute("commit")
+        await db_connection.execute("PRAGMA writable_schema = 0")
 
         self.log.info("Initializing blockchain from disk")
         start_time = time.time()
