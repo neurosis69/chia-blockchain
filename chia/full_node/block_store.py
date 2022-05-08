@@ -39,14 +39,15 @@ class BlockStore:
                 # of FullBlock, this can use less space
                 await conn.execute(
                     "CREATE TABLE IF NOT EXISTS full_blocks("
-                    "height INTEGER PRIMARY KEY,"
+                    "height int,"
+                    "header_hash blob,"
                     "in_main_chain tinyint,"
                     "is_fully_compactified tinyint,"
-                    "header_hash blob,"
                     "prev_hash blob,"
                     "sub_epoch_summary blob,"
                     "block blob,"
-                    "block_record blob)"
+                    "block_record blob,"
+                    "PRIMARY KEY(height, header_hash))"
                 )
 
                 # This is a single-row table containing the hash of the current
@@ -55,7 +56,7 @@ class BlockStore:
 
                 # If any of these indices are altered, they should also be altered
                 # in the chia/cmds/db_upgrade.py file
-                await conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS fb_header_hash on full_blocks(is_fully_compactified, in_main_chain, header_hash)")
+                await conn.execute("CREATE INDEX IF NOT EXISTS is_fully_compactified on full_blocks(is_fully_compactified, in_main_chain)")
 
                 # Sub epoch segments for weight proofs
                 await conn.execute(
@@ -181,9 +182,9 @@ class BlockStore:
                     "INSERT OR IGNORE INTO full_blocks VALUES(?, ?, ?, ?, ?, ?, ?, ?)",
                     (
                         block.height,
+                        header_hash,
                         False,  # in_main_chain
                         int(block.is_fully_compactified()),
-                        header_hash,
                         block.prev_header_hash,
                         ses,
                         self.compress(block),
