@@ -42,7 +42,6 @@ class BlockStore:
                     "height INTEGER PRIMARY KEY,"
                     "in_main_chain tinyint,"
                     "is_fully_compactified tinyint,"
-                    "in_main_chain tinyint,"
                     "header_hash blob,"
                     "prev_hash blob,"
                     "sub_epoch_summary blob,"
