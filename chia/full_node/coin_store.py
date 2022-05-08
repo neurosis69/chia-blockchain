@@ -51,7 +51,8 @@ class CoinStore:
                     " coinbase int,"
                     " amount blob,"  # we use a blob of 8 bytes to store uint64
                     " timestamp bigint,"
-                    " PRIMARY KEY(coin_name,puzzle_hash,coin_parent,confirmed_index,spent_index)) WITHOUT ROWID"
+#                    " PRIMARY KEY(coin_name,puzzle_hash,coin_parent,confirmed_index,spent_index))" 
+                    " PRIMARY KEY(coin_name)) WITHOUT ROWID"
                 )
 
             else:
@@ -74,13 +75,13 @@ class CoinStore:
                 )
 
             # Useful for reorg lookups
-#            await conn.execute("CREATE INDEX IF NOT EXISTS coin_coin_name on coin_record(coin_name)")
+            await conn.execute("CREATE INDEX IF NOT EXISTS coin_confirmed_index on coin_record(confirmed_index)")
 
-#            await conn.execute("CREATE INDEX IF NOT EXISTS coin_spent_index on coin_record(spent_index)")
+            await conn.execute("CREATE INDEX IF NOT EXISTS coin_spent_index on coin_record(spent_index)")
 
-#            await conn.execute("CREATE INDEX IF NOT EXISTS coin_puzzle_hash on coin_record(puzzle_hash)")
+            await conn.execute("CREATE INDEX IF NOT EXISTS coin_puzzle_hash on coin_record(puzzle_hash)")
 
-#            await conn.execute("CREATE INDEX IF NOT EXISTS coin_parent_index on coin_record(coin_parent)")
+            await conn.execute("CREATE INDEX IF NOT EXISTS coin_parent_index on coin_record(coin_parent)")
 
         self.coin_record_cache = LRUCache(cache_size)
         return self
