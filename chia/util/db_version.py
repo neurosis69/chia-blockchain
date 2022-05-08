@@ -5,6 +5,7 @@ import aiosqlite
 
 async def lookup_db_version(db: aiosqlite.Connection) -> int:
     try:
+        await db.execute("pragma page_size=16384")
         cursor = await db.execute("SELECT * from database_version")
         row = await cursor.fetchone()
         if row is not None and row[0] == 2:

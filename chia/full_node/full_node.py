@@ -198,7 +198,6 @@ class FullNode:
             await self.db_wrapper.add_connection(c)
 
         await (await db_connection.execute("pragma journal_mode=wal")).close()
-        await (await db_connection.execute("pragma page_size=16384")).close()
         db_sync = db_synchronous_on(self.config.get("db_sync", "auto"), self.db_path)
         self.log.info(f"opening blockchain DB: synchronous={db_sync}")
         await (await db_connection.execute("pragma synchronous={}".format(db_sync))).close()
