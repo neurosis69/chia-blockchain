@@ -180,12 +180,12 @@ class BlockStore:
                 await conn.execute(
                     "INSERT OR IGNORE INTO full_blocks VALUES(?, ?, ?, ?, ?, ?, ?, ?)",
                     (
+                        block.height,
+                        False,  # in_main_chain
+                        int(block.is_fully_compactified()),
                         header_hash,
                         block.prev_header_hash,
-                        block.height,
                         ses,
-                        int(block.is_fully_compactified()),
-                        False,  # in_main_chain
                         self.compress(block),
                         bytes(block_record),
                     ),

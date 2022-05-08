@@ -515,10 +515,10 @@ class CoinStore:
                 self.coin_record_cache.put(record.coin.name(), record)
                 values2.append(
                     (
-                        record.coin.name(),
                         record.confirmed_block_index,
                         record.spent_block_index,
                         int(record.coinbase),
+                        record.coin.name(),
                         record.coin.puzzle_hash,
                         record.coin.parent_coin_info,
                         bytes(record.coin.amount),
@@ -531,6 +531,7 @@ class CoinStore:
                         "INSERT INTO coin_record VALUES(?, ?, ?, ?, ?, ?, ?, ?)",
                         values2,
                     )
+
         else:
             values = []
             for record in records:
