@@ -43,7 +43,7 @@ class CoinStore:
                 # only represent a single peak
                 await conn.execute(
                     "CREATE TABLE IF NOT EXISTS coin_record("
-                    "confirmed_index int," # special behaviour not working at WITHOUT ROWID tables,
+                    "confirmed_index INTEGER PRIMARY KEY," # special behaviour not working at WITHOUT ROWID tables,
                     " spent_index int,"  # if this is zero, it means the coin has not been spent
                     " coinbase int,"
                     " coin_name blob,"
