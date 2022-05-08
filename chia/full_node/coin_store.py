@@ -43,15 +43,15 @@ class CoinStore:
                 # only represent a single peak
                 await conn.execute(
                     "CREATE TABLE IF NOT EXISTS coin_record("
-                    "confirmed_index int," # special behaviour not working at WITHOUT ROWID tables,
-                    " coin_name blob,"
-                    " spent_index int,"  # if this is zero, it means the coin has not been spent
-                    " coinbase int,"
+                    "coin_name blob,"
                     " puzzle_hash blob,"
                     " coin_parent blob,"
+                    " confirmed_index int," # special behaviour not working at WITHOUT ROWID tables,
+                    " spent_index int,"  # if this is zero, it means the coin has not been spent
+                    " coinbase int,"
                     " amount blob,"  # we use a blob of 8 bytes to store uint64
                     " timestamp bigint,"
-                    " PRIMARY KEY(confirmed_index, coin_name)) WITHOUT ROWID"
+                    " PRIMARY KEY(coin_name,puzzle_hash,coin_parent,confirmed_index,spent_index)) WITHOUT ROWID"
                 )
 
             else:
@@ -76,11 +76,11 @@ class CoinStore:
             # Useful for reorg lookups
 #            await conn.execute("CREATE INDEX IF NOT EXISTS coin_coin_name on coin_record(coin_name)")
 
-            await conn.execute("CREATE INDEX IF NOT EXISTS coin_spent_index on coin_record(spent_index)")
+#            await conn.execute("CREATE INDEX IF NOT EXISTS coin_spent_index on coin_record(spent_index)")
 
-            await conn.execute("CREATE INDEX IF NOT EXISTS coin_puzzle_hash on coin_record(puzzle_hash)")
+#            await conn.execute("CREATE INDEX IF NOT EXISTS coin_puzzle_hash on coin_record(puzzle_hash)")
 
-            await conn.execute("CREATE INDEX IF NOT EXISTS coin_parent_index on coin_record(coin_parent)")
+#            await conn.execute("CREATE INDEX IF NOT EXISTS coin_parent_index on coin_record(coin_parent)")
 
         self.coin_record_cache = LRUCache(cache_size)
         return self
@@ -516,12 +516,12 @@ class CoinStore:
                 self.coin_record_cache.put(record.coin.name(), record)
                 values2.append(
                     (
-                        record.confirmed_block_index,
                         record.coin.name(),
-                        record.spent_block_index,
-                        int(record.coinbase),
                         record.coin.puzzle_hash,
                         record.coin.parent_coin_info,
+                        record.confirmed_block_index,
+                        record.spent_block_index,
+                        int(record.coinbase),
                         bytes(record.coin.amount),
                         record.timestamp,
                     )
