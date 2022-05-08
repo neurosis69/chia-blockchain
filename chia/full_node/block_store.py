@@ -39,12 +39,13 @@ class BlockStore:
                 # of FullBlock, this can use less space
                 await conn.execute(
                     "CREATE TABLE IF NOT EXISTS full_blocks("
-                    "header_hash blob PRIMARY KEY,"
-                    "prev_hash blob,"
-                    "height bigint,"
-                    "sub_epoch_summary blob,"
+                    "height INTEGER PRIMARY KEY,"
+                    "in_main_chain tinyint,"
                     "is_fully_compactified tinyint,"
                     "in_main_chain tinyint,"
+                    "header_hash blob,"
+                    "prev_hash blob,"
+                    "sub_epoch_summary blob,"
                     "block blob,"
                     "block_record blob)"
                 )
@@ -55,7 +56,7 @@ class BlockStore:
 
                 # If any of these indices are altered, they should also be altered
                 # in the chia/cmds/db_upgrade.py file
-                await conn.execute("CREATE INDEX IF NOT EXISTS height on full_blocks(height)")
+                await conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS fb_header_hash on full_blocks(is_fully_compactified, in_main_chain, header_hash)")
 
                 # Sub epoch segments for weight proofs
                 await conn.execute(
@@ -66,13 +67,13 @@ class BlockStore:
 
                 # If any of these indices are altered, they should also be altered
                 # in the chia/cmds/db_upgrade.py file
-                await conn.execute(
-                    "CREATE INDEX IF NOT EXISTS is_fully_compactified ON"
-                    " full_blocks(is_fully_compactified, in_main_chain) WHERE in_main_chain=1"
-                )
-                await conn.execute(
-                    "CREATE INDEX IF NOT EXISTS main_chain ON full_blocks(height, in_main_chain) WHERE in_main_chain=1"
-                )
+#                await conn.execute(
+#                    "CREATE INDEX IF NOT EXISTS is_fully_compactified ON"
+#                    " full_blocks(is_fully_compactified, in_main_chain) WHERE in_main_chain=1 and is_fully_compactified=0"
+#                )
+#                await conn.execute(
+#                    "CREATE INDEX IF NOT EXISTS main_chain ON full_blocks(in_main_chain) WHERE in_main_chain=1"
+#                )
 
             else:
 

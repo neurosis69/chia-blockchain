@@ -162,12 +162,12 @@ class BlockHeightMap:
             if self.db.db_version == 2:
                 query = (
                     "SELECT header_hash,prev_hash,height,sub_epoch_summary from full_blocks "
-                    "INDEXED BY height WHERE height>=? AND height <?"
+                    "WHERE height>=? AND height <?"
                 )
             else:
                 query = (
                     "SELECT header_hash,prev_hash,height,sub_epoch_summary from block_records "
-                    "INDEXED BY height WHERE height>=? AND height <?"
+                    "WHERE height>=? AND height <?"
                 )
 
             async with self.db.read_db() as conn:

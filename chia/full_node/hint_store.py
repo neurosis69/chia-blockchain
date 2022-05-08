@@ -16,7 +16,7 @@ class HintStore:
 
         async with self.db_wrapper.write_db() as conn:
             if self.db_wrapper.db_version == 2:
-                await conn.execute("CREATE TABLE IF NOT EXISTS hints(coin_id blob, hint blob, UNIQUE (coin_id, hint))")
+                await conn.execute("CREATE TABLE IF NOT EXISTS hints(coin_id blob, hint blob, PRIMARY KEY (coin_id, hint)) WITHOUT ROWID")
             else:
                 await conn.execute(
                     "CREATE TABLE IF NOT EXISTS hints(id INTEGER PRIMARY KEY AUTOINCREMENT, coin_id blob, hint blob)"

@@ -43,14 +43,14 @@ class CoinStore:
                 # only represent a single peak
                 await conn.execute(
                     "CREATE TABLE IF NOT EXISTS coin_record("
-                    "coin_name blob PRIMARY KEY,"
-                    " confirmed_index bigint,"
-                    " spent_index bigint,"  # if this is zero, it means the coin has not been spent
+                    "confirmed_index int," # special behaviour not working at WITHOUT ROWID tables,
+                    " spent_index int,"  # if this is zero, it means the coin has not been spent
                     " coinbase int,"
+                    " coin_name blob,"
                     " puzzle_hash blob,"
                     " coin_parent blob,"
                     " amount blob,"  # we use a blob of 8 bytes to store uint64
-                    " timestamp bigint)"
+                    " timestamp bigint) WITHOUT ROWID"
                 )
 
             else:
@@ -73,9 +73,9 @@ class CoinStore:
                 )
 
             # Useful for reorg lookups
-            await conn.execute("CREATE INDEX IF NOT EXISTS coin_confirmed_index on coin_record(confirmed_index)")
+            await conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS coin_coin_name on coin_record(spent_index, coin_name)")
 
-            await conn.execute("CREATE INDEX IF NOT EXISTS coin_spent_index on coin_record(spent_index)")
+#            await conn.execute("CREATE INDEX IF NOT EXISTS coin_spent_index on coin_record(spent_index)")
 
             await conn.execute("CREATE INDEX IF NOT EXISTS coin_puzzle_hash on coin_record(puzzle_hash)")
 
@@ -268,7 +268,7 @@ class CoinStore:
         async with self.db_wrapper.read_db() as conn:
             async with conn.execute(
                 f"SELECT confirmed_index, spent_index, coinbase, puzzle_hash, "
-                f"coin_parent, amount, timestamp FROM coin_record INDEXED BY coin_puzzle_hash WHERE puzzle_hash=? "
+                f"coin_parent, amount, timestamp FROM coin_record WHERE puzzle_hash=? "
                 f"AND confirmed_index>=? AND confirmed_index<? "
                 f"{'' if include_spent_coins else 'AND spent_index=0'}",
                 (self.maybe_to_hex(puzzle_hash), start_height, end_height),
@@ -299,7 +299,7 @@ class CoinStore:
         async with self.db_wrapper.read_db() as conn:
             async with conn.execute(
                 f"SELECT confirmed_index, spent_index, coinbase, puzzle_hash, "
-                f"coin_parent, amount, timestamp FROM coin_record INDEXED BY coin_puzzle_hash "
+                f"coin_parent, amount, timestamp FROM coin_record "
                 f'WHERE puzzle_hash in ({"?," * (len(puzzle_hashes) - 1)}?) '
                 f"AND confirmed_index>=? AND confirmed_index<? "
                 f"{'' if include_spent_coins else 'AND spent_index=0'}",
@@ -331,7 +331,7 @@ class CoinStore:
         async with self.db_wrapper.read_db() as conn:
             async with conn.execute(
                 f"SELECT confirmed_index, spent_index, coinbase, puzzle_hash, "
-                f"coin_parent, amount, timestamp FROM coin_record INDEXED BY sqlite_autoindex_coin_record_1 "
+                f"coin_parent, amount, timestamp FROM coin_record "
                 f'WHERE coin_name in ({"?," * (len(names) - 1)}?) '
                 f"AND confirmed_index>=? AND confirmed_index<? "
                 f"{'' if include_spent_coins else 'AND spent_index=0'}",
@@ -375,7 +375,7 @@ class CoinStore:
                     puzzle_hashes_db = tuple([ph.hex() for ph in puzzles])
                 async with conn.execute(
                     f"SELECT confirmed_index, spent_index, coinbase, puzzle_hash, "
-                    f"coin_parent, amount, timestamp FROM coin_record INDEXED BY coin_puzzle_hash "
+                    f"coin_parent, amount, timestamp FROM coin_record "
                     f'WHERE puzzle_hash in ({"?," * (len(puzzles) - 1)}?) '
                     f"AND (confirmed_index>=? OR spent_index>=?)"
                     f"{'' if include_spent_coins else 'AND spent_index=0'}",
