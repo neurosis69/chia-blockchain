@@ -51,8 +51,8 @@ class CoinStore:
                     " coinbase int,"
                     " amount blob,"  # we use a blob of 8 bytes to store uint64
                     " timestamp bigint,"
-                    " PRIMARY KEY(coin_name,puzzle_hash,coin_parent,confirmed_index,spent_index))" 
-#                    " PRIMARY KEY(coin_name)) WITHOUT ROWID"
+#                    " PRIMARY KEY(coin_name,puzzle_hash,coin_parent,confirmed_index,spent_index))" 
+                    " PRIMARY KEY(coin_name)) WITHOUT ROWID"
                 )
 
             else:
