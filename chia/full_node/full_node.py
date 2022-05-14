@@ -194,7 +194,7 @@ class FullNode:
             await (await db_connection.execute("pragma journal_mode=off")).close()
             db_sync = "off"
             coin_cache_size=6000000
-        else
+        else:
             await (await db_connection.execute("pragma journal_mode=wal")).close()
             db_sync = db_synchronous_on(self.config.get("db_sync", "auto"), self.db_path)
             coin_cache_size=60000

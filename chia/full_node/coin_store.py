@@ -72,7 +72,16 @@ class CoinStore:
                     )
                 )
 
-            if not fastsync: 
+            if fastsync: 
+                await conn.execute("DROP INDEX coin_confirmed_index")
+
+                await conn.execute("DROP INDEX coin_spent_index")
+
+                await conn.execute("DROP INDEX coin_puzzle_hash")
+
+                await conn.execute("DROP INDEX coin_parent_index")
+
+            else:
                 # Useful for reorg lookups
                 await conn.execute("CREATE INDEX IF NOT EXISTS coin_confirmed_index on coin_record(confirmed_index)")
 
