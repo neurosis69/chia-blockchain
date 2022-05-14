@@ -189,7 +189,7 @@ class FullNode:
 
         ####
         # FastSync
-        fastsync = self.config.get("fastsync", False)
+        fastsync = self.config.get("fast_sync", False)
         if fastsync == True: 
             await (await db_connection.execute("pragma journal_mode=off")).close()
             db_sync = "off"
