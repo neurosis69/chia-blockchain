@@ -1173,6 +1173,7 @@ class FullNode:
         self.log.info("long sync done")
         self.sync_store.set_long_sync(False)
         self.sync_store.set_sync_mode(False)
+        self.config["fast_sync"] = False
         self._state_changed("sync_mode")
         if self.server is None:
             return None
