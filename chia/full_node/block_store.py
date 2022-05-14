@@ -67,7 +67,7 @@ class BlockStore:
                 # If any of these indices are altered, they should also be altered
                 # in the chia/cmds/db_upgrade.py file
                 if fastsync:
-                    await conn.execute("DROP INDEX is_fully_compactified")
+                    await conn.execute("DROP INDEX IF EXISTS is_fully_compactified")
                 else:
                     await conn.execute(
                         "CREATE INDEX IF NOT EXISTS is_fully_compactified ON"
@@ -102,8 +102,8 @@ class BlockStore:
                 await conn.execute("CREATE INDEX IF NOT EXISTS full_block_height on full_blocks(height)")
 
                 if fastsync:
-                    await conn.execute("DROP INDEX is_fully_compactified")
-                    await conn.execute("DROP INDEX height")
+                    await conn.execute("DROP INDEX IF EXISTS is_fully_compactified")
+                    await conn.execute("DROP INDEX IF EXISTS height")
                 else:
                     await conn.execute(
                         "CREATE INDEX IF NOT EXISTS is_fully_compactified on full_blocks(is_fully_compactified)"
