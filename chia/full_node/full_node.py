@@ -187,8 +187,19 @@ class FullNode:
                 await c.set_trace_callback(sql_trace_callback)
             await self.db_wrapper.add_connection(c)
 
-        await (await db_connection.execute("pragma journal_mode=wal")).close()
-        db_sync = db_synchronous_on(self.config.get("db_sync", "auto"), self.db_path)
+        ####
+        # FastSync
+        fastsync = self.config.get("fastsync", False)
+        if fastsync == True: 
+            await (await db_connection.execute("pragma journal_mode=off")).close()
+            db_sync = "off"
+            coin_cache_size=6000000
+        else
+            await (await db_connection.execute("pragma journal_mode=wal")).close()
+            db_sync = db_synchronous_on(self.config.get("db_sync", "auto"), self.db_path)
+            coin_cache_size=60000
+        ####
+
         self.log.info(f"opening blockchain DB: synchronous={db_sync}")
         await (await db_connection.execute("pragma synchronous={}".format(db_sync))).close()
 
@@ -208,10 +219,10 @@ class FullNode:
                             # empty except it has the database_version table
                             pass
 
-        self.block_store = await BlockStore.create(self.db_wrapper)
+        self.block_store = await BlockStore.create(self.db_wrapper, fastsync)
         self.sync_store = await SyncStore.create()
         self.hint_store = await HintStore.create(self.db_wrapper)
-        self.coin_store = await CoinStore.create(self.db_wrapper)
+        self.coin_store = await CoinStore.create(self.db_wrapper, coin_cache_size, fastsync)
         self.log.info("Initializing blockchain from disk")
         start_time = time.time()
         reserved_cores = self.config.get("reserved_cores", 0)

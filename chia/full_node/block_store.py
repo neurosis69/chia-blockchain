@@ -23,7 +23,7 @@ class BlockStore:
     ses_challenge_cache: LRUCache
 
     @classmethod
-    async def create(cls, db_wrapper: DBWrapper2):
+    async def create(cls, db_wrapper: DBWrapper2, fastsync = False):
         self = cls()
         # All full blocks which have been added to the blockchain. Header_hash -> block
         self.db_wrapper = db_wrapper
@@ -66,10 +66,14 @@ class BlockStore:
 
                 # If any of these indices are altered, they should also be altered
                 # in the chia/cmds/db_upgrade.py file
-                await conn.execute(
-                    "CREATE INDEX IF NOT EXISTS is_fully_compactified ON"
-                    " full_blocks(is_fully_compactified, in_main_chain) WHERE in_main_chain=1"
-                )
+                if fastsync:
+                    await conn.execute("DROP INDEX is_fully_compactified")
+                else
+                    await conn.execute(
+                        "CREATE INDEX IF NOT EXISTS is_fully_compactified ON"
+                        " full_blocks(is_fully_compactified, in_main_chain) WHERE in_main_chain=1"
+                    )
+
                 await conn.execute(
                     "CREATE INDEX IF NOT EXISTS main_chain ON full_blocks(height, in_main_chain) WHERE in_main_chain=1"
                 )
@@ -96,11 +100,15 @@ class BlockStore:
 
                 # Height index so we can look up in order of height for sync purposes
                 await conn.execute("CREATE INDEX IF NOT EXISTS full_block_height on full_blocks(height)")
-                await conn.execute(
-                    "CREATE INDEX IF NOT EXISTS is_fully_compactified on full_blocks(is_fully_compactified)"
-                )
 
-                await conn.execute("CREATE INDEX IF NOT EXISTS height on block_records(height)")
+                if fastsync:
+                    await conn.execute("DROP INDEX is_fully_compactified")
+                    await conn.execute("DROP INDEX height")
+                else
+                    await conn.execute(
+                        "CREATE INDEX IF NOT EXISTS is_fully_compactified on full_blocks(is_fully_compactified)"
+                    )
+                    await conn.execute("CREATE INDEX IF NOT EXISTS height on block_records(height)")
 
                 await conn.execute("CREATE INDEX IF NOT EXISTS peak on block_records(is_peak)")
 

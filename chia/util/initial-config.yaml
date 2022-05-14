@@ -331,6 +331,17 @@ full_node:
   # "auto"  on/off is decided based on a heuristic of how likely a failure is on
   #         the particular system we're running on. Defaults to "full".
   db_sync: "auto"
+ 
+  # controls if full node fast sync mode is used
+  # False   is default and equals the normal chia full node behaviour
+  # True    improves the full node sync speed by
+  #         - dropping coin_record indexes to reduce index maintenance overhead
+  #         - dropping not needed full_block indexes
+  #         - disables wal logging mode
+  #         - disables synchronous mode
+  #         the database can get corrupted when the full node crashes (power loss, ...)
+  #         set to True only during sync
+  fast_sync: False
 
   # the number of threads used to read from the blockchain database
   # concurrently. There's always only 1 writer, but the number of readers is
