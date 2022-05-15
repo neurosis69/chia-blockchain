@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from typing import List, Tuple, Optional
 
 from blspy import G1Element, G2Element
 

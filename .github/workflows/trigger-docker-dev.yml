@@ -1,10 +1,6 @@
 name: Trigger Dev Docker Build
 
 on:
-  push:
-    branches:
-      - 'long_lived/**'
-      - 'release/**'
   pull_request:
 
 concurrency:

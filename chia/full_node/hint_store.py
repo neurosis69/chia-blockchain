@@ -35,9 +35,6 @@ class HintStore:
         return coin_ids
 
     async def add_hints(self, coin_hint_list: List[Tuple[bytes32, bytes]]) -> None:
-        if len(coin_hint_list) == 0:
-            return None
-
         async with self.db_wrapper.write_db() as conn:
             if self.db_wrapper.db_version == 2:
                 cursor = await conn.executemany(

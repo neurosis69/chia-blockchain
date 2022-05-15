@@ -62,7 +62,9 @@ async def async_start(root_path: Path, group: str, restart: bool) -> None:
         if await daemon.is_running(service_name=service):
             print(f"{service}: ", end="", flush=True)
             if restart:
-                if await daemon.stop_service(service_name=service):
+                if not await daemon.is_running(service_name=service):
+                    print("not running")
+                elif await daemon.stop_service(service_name=service):
                     print("stopped")
                 else:
                     print("stop failed")

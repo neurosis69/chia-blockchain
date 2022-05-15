@@ -72,7 +72,6 @@ async def main(db_path: Path):
         )
 
         peak = blockchain.get_peak()
-        assert peak is not None
         timing = 0.0
         for i in range(REPETITIONS):
             block = BlockInfo(

@@ -1,7 +1,7 @@
 import logging
 from collections import Counter
 from pathlib import Path
-from time import sleep, time
+from time import time, sleep
 from typing import List
 
 from blspy import G1Element
@@ -9,11 +9,11 @@ from chiapos import Verifier
 
 from chia.plotting.manager import PlotManager
 from chia.plotting.util import (
-    PlotRefreshEvents,
     PlotRefreshResult,
     PlotsRefreshParameter,
-    find_duplicate_plot_IDs,
+    PlotRefreshEvents,
     get_plot_filenames,
+    find_duplicate_plot_IDs,
     parse_plot_info,
 )
 from chia.util.bech32m import encode_puzzle_hash

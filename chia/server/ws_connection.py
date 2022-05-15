@@ -109,13 +109,7 @@ class WSChiaConnection:
         self.version = None
         self.protocol_version = ""
 
-    async def perform_handshake(
-        self,
-        network_id: str,
-        protocol_version: str,
-        server_port: int,
-        local_type: NodeType,
-    ) -> None:
+    async def perform_handshake(self, network_id: str, protocol_version: str, server_port: int, local_type: NodeType):
         if self.is_outbound:
             outbound_handshake = make_msg(
                 ProtocolMessageTypes.handshake,
@@ -190,6 +184,7 @@ class WSChiaConnection:
 
         self.outbound_task = asyncio.create_task(self.outbound_handler())
         self.inbound_task = asyncio.create_task(self.inbound_handler())
+        return True
 
     async def close(self, ban_time: int = 0, ws_close_code: WSCloseCode = WSCloseCode.OK, error: Optional[Err] = None):
         """

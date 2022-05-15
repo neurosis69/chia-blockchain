@@ -1,14 +1,12 @@
 #
 # THIS FILE IS GENERATED. SEE https://github.com/Chia-Network/chia-blockchain/tree/main/tests#readme
 #
-name: MacOS core-full_node-full_sync Test
+name: MacOS core-full_node-full_sync Tests
 
 on:
   push:
     branches:
-      - 'long_lived/**'
       - main
-      - 'release/**'
     tags:
         - '**'
   pull_request:
@@ -95,7 +93,7 @@ jobs:
     - name: Test core-full_node-full_sync code with pytest
       run: |
         . ./activate
-        venv/bin/coverage run --rcfile=.coveragerc --module pytest --durations=10  -n 4 -m "not benchmark" tests/core/full_node/full_sync/test_full_sync.py
+        venv/bin/coverage run --rcfile=.coveragerc ./venv/bin/py.test tests/core/full_node/full_sync/test_*.py --durations=10  -n 4 -m "not benchmark"
 
     - name: Process coverage data
       run: |

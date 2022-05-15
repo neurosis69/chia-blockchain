@@ -1,14 +1,12 @@
 #
 # THIS FILE IS GENERATED. SEE https://github.com/Chia-Network/chia-blockchain/tree/main/tests#readme
 #
-name: MacOS wallet-simple_sync Test
+name: MacOS wallet-simple_sync Tests
 
 on:
   push:
     branches:
-      - 'long_lived/**'
       - main
-      - 'release/**'
     tags:
         - '**'
   pull_request:
@@ -95,7 +93,7 @@ jobs:
     - name: Test wallet-simple_sync code with pytest
       run: |
         . ./activate
-        venv/bin/coverage run --rcfile=.coveragerc --module pytest --durations=10  -n 0 -m "not benchmark" tests/wallet/simple_sync/test_simple_sync_protocol.py
+        venv/bin/coverage run --rcfile=.coveragerc ./venv/bin/py.test tests/wallet/simple_sync/test_*.py --durations=10  -n 0 -m "not benchmark"
 
     - name: Process coverage data
       run: |

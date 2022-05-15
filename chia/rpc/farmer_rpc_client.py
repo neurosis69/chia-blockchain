@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 from chia.rpc.farmer_rpc_api import PlotInfoRequestData, PlotPathRequestData
 from chia.rpc.rpc_client import RpcClient
@@ -24,11 +24,8 @@ class FarmerRpcClient(RpcClient):
     async def get_signage_points(self) -> List[Dict]:
         return (await self.fetch("get_signage_points", {}))["signage_points"]
 
-    async def get_reward_targets(self, search_for_private_key: bool, max_ph_to_search: int = 500) -> Dict:
-        response = await self.fetch(
-            "get_reward_targets",
-            {"search_for_private_key": search_for_private_key, "max_ph_to_search": max_ph_to_search},
-        )
+    async def get_reward_targets(self, search_for_private_key: bool) -> Dict:
+        response = await self.fetch("get_reward_targets", {"search_for_private_key": search_for_private_key})
         return_dict = {
             "farmer_target": response["farmer_target"],
             "pool_target": response["pool_target"],

@@ -17,10 +17,7 @@ async def async_stop(root_path: Path, group: str, stop_daemon: bool) -> int:
     if stop_daemon:
         r = await daemon.exit()
         await daemon.close()
-        if r.get("data", {}).get("success", False):
-            print("Daemon stopped")
-        else:
-            print(f"Stop daemon failed {r}")
+        print(f"daemon: {r}")
         return 0
 
     return_val = 0

@@ -1,6 +1,5 @@
 import dataclasses
 import logging
-from typing import Any
 
 from chia.types.blockchain_format.sized_bytes import bytes32
 from chia.util.byte_types import hexstr_to_bytes
@@ -62,10 +61,10 @@ class ConsensusConstants:
     POOL_SUB_SLOT_ITERS: uint64
     SOFT_FORK_HEIGHT: uint32
 
-    def replace(self, **changes: object) -> "ConsensusConstants":
+    def replace(self, **changes) -> "ConsensusConstants":
         return dataclasses.replace(self, **changes)
 
-    def replace_str_to_bytes(self, **changes: Any) -> "ConsensusConstants":
+    def replace_str_to_bytes(self, **changes) -> "ConsensusConstants":
         """
         Overrides str (hex) values with bytes.
         """

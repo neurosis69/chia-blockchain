@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import threading
 import time
 import traceback
 from dataclasses import dataclass
@@ -90,6 +91,7 @@ class Sender:
     _last_sync_id: uint64
     _stop_requested = False
     _task: Optional[asyncio.Task]  # type: ignore[type-arg]  # Asks for Task parameter which doesn't work
+    _lock: threading.Lock
     _response: Optional[ExpectedResponse]
 
     def __init__(self, plot_manager: PlotManager) -> None:
@@ -101,6 +103,7 @@ class Sender:
         self._last_sync_id = uint64(0)
         self._stop_requested = False
         self._task = None
+        self._lock = threading.Lock()
         self._response = None
 
     def __str__(self) -> str:
@@ -142,6 +145,8 @@ class Sender:
         self._sync_id = uint64(0)
         self._next_message_id = uint64(0)
         self._messages.clear()
+        if self._lock.locked():
+            self._lock.release()
         if self._task is not None:
             # TODO, Add typing in PlotManager
             self.sync_start(self._plot_manager.plot_count(), True)  # type:ignore[no-untyped-call]
@@ -251,11 +256,7 @@ class Sender:
 
     def sync_start(self, count: float, initial: bool) -> None:
         log.debug(f"sync_start {self}: count {count}, initial {initial}")
-        while self.sync_active():
-            if self._stop_requested:
-                log.debug("sync_start aborted")
-                return
-            time.sleep(0.1)
+        self._lock.acquire()
         sync_id = int(time.time())
         # Make sure we have unique sync-id's even if we restart refreshing within a second (i.e. in tests)
         if sync_id == self._last_sync_id:
@@ -293,13 +294,13 @@ class Sender:
         log.debug(f"_finalize_sync {self}")
         assert self._sync_id != 0
         self._last_sync_id = self._sync_id
+        self._sync_id = uint64(0)
         self._next_message_id = uint64(0)
         self._messages.clear()
-        # Do this at the end since `_sync_id` is used as sync active indicator.
-        self._sync_id = uint64(0)
+        self._lock.release()
 
     def sync_active(self) -> bool:
-        return self._sync_id != 0
+        return self._lock.locked() and self._sync_id != 0
 
     def connected(self) -> bool:
         return self._connection is not None

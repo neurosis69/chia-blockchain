@@ -1,6 +1,5 @@
-from pathlib import Path
 from typing import List
-
+from pathlib import Path
 from tests.block_tools import get_plot_dir
 
 
