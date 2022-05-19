@@ -375,20 +375,39 @@ class BlockStore:
             return []
 
         all_blocks: Dict[bytes32, BlockRecord] = {}
+
         if self.db_wrapper.db_version == 2:
             async with self.db_wrapper.read_db() as conn:
-                async with conn.execute(
-                    "SELECT header_hash,block_record FROM full_blocks "
-                    f'WHERE header_hash in ({"?," * (len(header_hashes) - 1)}?)',
-                    tuple(header_hashes),
-                ) as cursor:
+                cursors: List[Cursor] = []
+                for header_hashes_chunk in chunks(header_hashes, self.db_wrapper.SQLITE_MAX_VARIABLE_NUMBER):
+                    header_hashes_db: Tuple[Any, ...]
+                    header_hashes_db = tuple(header_hashes_chunk)
+                    cursors.append(
+                        await conn.execute(
+                            "SELECT header_hash,block_record FROM full_blocks "
+                            f'WHERE header_hash in ({",".join(["?"] * len(header_hashes))})',
+                            header_hashes_db,
+                        )
+                    )
+
+                for cursor in cursors:
                     for row in await cursor.fetchall():
                         header_hash = bytes32(row[0])
                         all_blocks[header_hash] = BlockRecord.from_bytes(row[1])
         else:
-            formatted_str = f'SELECT block from block_records WHERE header_hash in ({"?," * (len(header_hashes) - 1)}?)'
+            formatted_str = f'SELECT block from block_records WHERE header_hash in ({",".join(["?"] * len(header_hashes))})'
             async with self.db_wrapper.read_db() as conn:
-                async with conn.execute(formatted_str, tuple([hh.hex() for hh in header_hashes])) as cursor:
+                cursors: List[Cursor] = []
+                for header_hashes_chunk in chunks(header_hashes, self.db_wrapper.SQLITE_MAX_VARIABLE_NUMBER):
+                    header_hashes_db: Tuple[Any, ...]
+                    header_hashes_db = tuple([n.hex() for n in header_hashes_chunk])
+                    cursors.append(
+                        await conn.execute(
+                            formatted_str, header_hashes_db,
+                        )
+                    )
+
+                for cursor in cursors:
                     for row in await cursor.fetchall():
                         block_rec: BlockRecord = BlockRecord.from_bytes(row[0])
                         all_blocks[block_rec.header_hash] = block_rec
