@@ -112,11 +112,11 @@ install_python3_and_sqlite3_from_source_with_yum() {
 install_sqlite3() {
   # Install sqlite>=3.37
   # yum install sqlite-devel brings sqlite3.7 which is not compatible with chia
-  echo "wget https://www.sqlite.org/2022/sqlite-autoconf-3370200.tar.gz"
-  wget https://www.sqlite.org/2022/sqlite-autoconf-3370200.tar.gz
-  tar xf sqlite-autoconf-3370200.tar.gz
-  echo "cd sqlite-autoconf-3370200"
-  cd sqlite-autoconf-3370200
+  echo "wget https://www.sqlite.org/2022/sqlite-autoconf-3380500.tar.gz"
+  wget https://www.sqlite.org/2022/sqlite-autoconf-3380500.tar.gz
+  tar xf sqlite-autoconf-3380500.tar.gz
+  echo "cd sqlite-autoconf-3380500"
+  cd sqlite-autoconf-3380500
   echo 'CFLAGS="-DSQLITE_OMIT_SHARED_CACHE"'
   # '| stdbuf ...' seems weird but this makes command outputs stay in single line.
   export CFLAGS="-DSQLITE_OMIT_SHARED_CACHE"
@@ -127,7 +127,7 @@ install_sqlite3() {
   echo "sudo make install"
   sudo make install | stdbuf -o0 cut -b1-"$(tput cols)" | sed -u 'i\\o033[2K' | stdbuf -o0 tr '\n' '\r'; echo
   cd ..
-  rm -Rf sqlite-autoconf-3370200
+  rm -Rf sqlite-autoconf-3380500
 }
 
 # Manage npm and other install requirements on an OS specific basis
