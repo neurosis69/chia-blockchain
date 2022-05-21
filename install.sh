@@ -91,20 +91,7 @@ install_python3_and_sqlite3_from_source_with_yum() {
 
   echo "cd $TMP_PATH"
   cd "$TMP_PATH"
-  # Install sqlite>=3.37
-  # yum install sqlite-devel brings sqlite3.7 which is not compatible with chia
-  echo "wget https://www.sqlite.org/2022/sqlite-autoconf-3370200.tar.gz"
-  wget https://www.sqlite.org/2022/sqlite-autoconf-3370200.tar.gz
-  tar xf sqlite-autoconf-3370200.tar.gz
-  echo "cd sqlite-autoconf-3370200"
-  cd sqlite-autoconf-3370200
-  echo "./configure --prefix=/usr/local"
-  # '| stdbuf ...' seems weird but this makes command outputs stay in single line.
-  ./configure --prefix=/usr/local | stdbuf -o0 cut -b1-"$(tput cols)" | sed -u 'i\\o033[2K' | stdbuf -o0 tr '\n' '\r'; echo
-  echo "make -j$(nproc)"
-  make -j"$(nproc)" | stdbuf -o0 cut -b1-"$(tput cols)" | sed -u 'i\\o033[2K' | stdbuf -o0 tr '\n' '\r'; echo
-  echo "sudo make install"
-  sudo make install | stdbuf -o0 cut -b1-"$(tput cols)" | sed -u 'i\\o033[2K' | stdbuf -o0 tr '\n' '\r'; echo
+  install_sqlite3
   # yum install python3 brings Python3.6 which is not supported by chia
   cd ..
   echo "wget https://www.python.org/ftp/python/3.9.11/Python-3.9.11.tgz"
@@ -122,6 +109,27 @@ install_python3_and_sqlite3_from_source_with_yum() {
   cd "$CURRENT_WD"
 }
 
+install_sqlite3() {
+  # Install sqlite>=3.37
+  # yum install sqlite-devel brings sqlite3.7 which is not compatible with chia
+  echo "wget https://www.sqlite.org/2022/sqlite-autoconf-3370200.tar.gz"
+  wget https://www.sqlite.org/2022/sqlite-autoconf-3370200.tar.gz
+  tar xf sqlite-autoconf-3370200.tar.gz
+  echo "cd sqlite-autoconf-3370200"
+  cd sqlite-autoconf-3370200
+  echo 'CFLAGS="-DSQLITE_OMIT_SHARED_CACHE"'
+  # '| stdbuf ...' seems weird but this makes command outputs stay in single line.
+  export CFLAGS="-DSQLITE_OMIT_SHARED_CACHE"
+  echo "./configure --prefix=/usr/local"
+  ./configure --prefix=/usr/local | stdbuf -o0 cut -b1-"$(tput cols)" | sed -u 'i\\o033[2K' | stdbuf -o0 tr '\n' '\r'; echo
+  echo "make -j$(nproc)"
+  make -j"$(nproc)" | stdbuf -o0 cut -b1-"$(tput cols)" | sed -u 'i\\o033[2K' | stdbuf -o0 tr '\n' '\r'; echo
+  echo "sudo make install"
+  sudo make install | stdbuf -o0 cut -b1-"$(tput cols)" | sed -u 'i\\o033[2K' | stdbuf -o0 tr '\n' '\r'; echo
+  cd ..
+  rm -Rf sqlite-autoconf-3370200
+}
+
 # Manage npm and other install requirements on an OS specific basis
 if [ "$(uname)" = "Linux" ]; then
   #LINUX=1
@@ -137,18 +145,22 @@ if [ "$(uname)" = "Linux" ]; then
     echo "Installing on Ubuntu 20.*."
     sudo apt-get update
     sudo apt-get install -y python3.8-venv openssl
+    install_sqlite3
   elif [ "$UBUNTU_21" = "1" ]; then
     echo "Installing on Ubuntu 21.*."
     sudo apt-get update
     sudo apt-get install -y python3.9-venv openssl
+    install_sqlite3
   elif [ "$UBUNTU_22" = "1" ]; then
     echo "Installing on Ubuntu 22.* or newer."
     sudo apt-get update
     sudo apt-get install -y python3.10-venv openssl
+    install_sqlite3
   elif [ "$DEBIAN" = "true" ]; then
     echo "Installing on Debian."
     sudo apt-get update
     sudo apt-get install -y python3-venv openssl
+    install_sqlite3
   elif type pacman >/dev/null 2>&1 && [ -f "/etc/arch-release" ]; then
     # Arch Linux
     # Arch provides latest python version. User will need to manually install python 3.9 if it is not present
@@ -156,6 +168,7 @@ if [ "$(uname)" = "Linux" ]; then
     case $(uname -m) in
       x86_64|aarch64)
         sudo pacman ${PACMAN_AUTOMATED} -S --needed git openssl
+	install_sqlite3
         ;;
       *)
         echo "Incompatible CPU architecture. Must be x86_64 or aarch64."
@@ -178,12 +191,16 @@ if [ "$(uname)" = "Linux" ]; then
     echo "Installing on Rocky."
     # TODO: make this smarter about getting the latest version
     sudo yum install --assumeyes python39 openssl
+    install_sqlite3
   elif type yum >/dev/null 2>&1 && [ -f "/etc/redhat-release" ] || [ -f "/etc/fedora-release" ]; then
     # Redhat or Fedora
     echo "Installing on Redhat/Fedora."
     if ! command -v python3.9 >/dev/null 2>&1; then
       sudo yum install -y python39 openssl
+      install_sqlite3
     fi
+  else
+    install_sqlite3
   fi
 elif [ "$(uname)" = "Darwin" ]; then
   echo "Installing on macOS."
@@ -308,3 +325,4 @@ echo ""
 echo "To install the GUI type 'sh install-gui.sh' after '. ./activate'."
 echo ""
 echo "Type '. ./activate' and then 'chia init' to begin."
+
