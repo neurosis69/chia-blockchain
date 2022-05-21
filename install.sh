@@ -117,9 +117,9 @@ install_sqlite3() {
   tar xf sqlite-autoconf-3370200.tar.gz
   echo "cd sqlite-autoconf-3370200"
   cd sqlite-autoconf-3370200
-  echo 'CFLAGS="-DSQLITE_ENABLE_BATCH_ATOMIC_WRITE=1 -DSQLITE_ENABLE_ATOMIC_WRITE=1 -SQLITE_DEFAULT_MEMSTATUS=0"'
+  echo 'CFLAGS="-SQLITE_DEFAULT_MEMSTATUS=0"'
   # '| stdbuf ...' seems weird but this makes command outputs stay in single line.
-  export CFLAGS="-DSQLITE_ENABLE_BATCH_ATOMIC_WRITE=1 -DSQLITE_ENABLE_ATOMIC_WRITE=1 -DSQLITE_ENABLE_STAT4=1"
+  export CFLAGS="-SQLITE_DEFAULT_MEMSTATUS=0"
   echo "./configure --prefix=/usr/local"
   ./configure --prefix=/usr/local | stdbuf -o0 cut -b1-"$(tput cols)" | sed -u 'i\\o033[2K' | stdbuf -o0 tr '\n' '\r'; echo
   echo "make -j$(nproc)"
