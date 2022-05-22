@@ -112,16 +112,14 @@ install_python3_and_sqlite3_from_source_with_yum() {
 install_sqlite3() {
   # Install sqlite>=3.37
   # yum install sqlite-devel brings sqlite3.7 which is not compatible with chia
-  echo "wget https://www.sqlite.org/2022/sqlite-autoconf-3370200.tar.gz"
-  wget https://www.sqlite.org/2022/sqlite-autoconf-3370200.tar.gz
-  tar xf sqlite-autoconf-3370200.tar.gz
-  echo "cd sqlite-autoconf-3370200"
-  cd sqlite-autoconf-3370200
-  echo 'CFLAGS="-DSQLITE_ENABLE_STAT4=1 -DSQLITE_DEFAULT_MEMSTATUS -DSQLITE_LIKE_DOESNT_MATCH_BLOBS -DSQLITE_MAX_EXPR_DEPTH=0 -DSQLITE_OMIT_PROGRESS_CALLBACK -DSQLITE_OMIT_S
-HARED_CACHE -DSQLITE_USE_ALLOCA -DSQLITE_DIRECT_OVERFLOW_READ"'
+  echo "wget https://www.sqlite.org/2022/sqlite-autoconf-3380500.tar.gz"
+  wget https://www.sqlite.org/2022/sqlite-autoconf-3380500.tar.gz
+  tar xf sqlite-autoconf-3380500.tar.gz
+  echo "cd sqlite-autoconf-3380500"
+  cd sqlite-autoconf-3380500
+  echo 'CFLAGS="-O2 -DSQLITE_ENABLE_STAT4=1 -DSQLITE_DEFAULT_MEMSTATUS -DSQLITE_LIKE_DOESNT_MATCH_BLOBS -DSQLITE_MAX_EXPR_DEPTH=0 -DSQLITE_OMIT_PROGRESS_CALLBACK -DSQLITE_OMIT_SHARED_CACHE -DSQLITE_USE_ALLOCA -DSQLITE_DIRECT_OVERFLOW_READ"'
   # '| stdbuf ...' seems weird but this makes command outputs stay in single line.
-  export CFLAGS="-DSQLITE_ENABLE_STAT4=1 -DSQLITE_DEFAULT_MEMSTATUS -DSQLITE_LIKE_DOESNT_MATCH_BLOBS -DSQLITE_MAX_EXPR_DEPTH=0 -DSQLITE_OMIT_PROGRESS_CALLBACK -DSQLITE_OMIT_
-SHARED_CACHE -DSQLITE_USE_ALLOCA -DSQLITE_DIRECT_OVERFLOW_READ"
+  export CFLAGS="-O2 -DSQLITE_ENABLE_STAT4=1 -DSQLITE_DEFAULT_MEMSTATUS -DSQLITE_LIKE_DOESNT_MATCH_BLOBS -DSQLITE_MAX_EXPR_DEPTH=0 -DSQLITE_OMIT_PROGRESS_CALLBACK -DSQLITE_OMIT_SHARED_CACHE -DSQLITE_USE_ALLOCA -DSQLITE_DIRECT_OVERFLOW_READ"
   echo "./configure --prefix=/usr/local"
   ./configure --prefix=/usr/local | stdbuf -o0 cut -b1-"$(tput cols)" | sed -u 'i\\o033[2K' | stdbuf -o0 tr '\n' '\r'; echo
   echo "make -j$(nproc)"
@@ -129,7 +127,7 @@ SHARED_CACHE -DSQLITE_USE_ALLOCA -DSQLITE_DIRECT_OVERFLOW_READ"
   echo "sudo make install"
   sudo make install | stdbuf -o0 cut -b1-"$(tput cols)" | sed -u 'i\\o033[2K' | stdbuf -o0 tr '\n' '\r'; echo
   cd ..
-  rm -Rf sqlite-autoconf-3370200
+  rm -Rf sqlite-autoconf-3380500*
 }
 
 # Manage npm and other install requirements on an OS specific basis
