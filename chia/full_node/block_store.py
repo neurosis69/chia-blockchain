@@ -66,10 +66,11 @@ class BlockStore:
 
                 # If any of these indices are altered, they should also be altered
                 # in the chia/cmds/db_upgrade.py file
-                await conn.execute(
-                    "CREATE INDEX IF NOT EXISTS is_fully_compactified ON"
-                    " full_blocks(is_fully_compactified, in_main_chain) WHERE in_main_chain=1"
-                )
+#                await conn.execute(
+#                    "CREATE INDEX IF NOT EXISTS is_fully_compactified ON"
+#                    " full_blocks(is_fully_compactified, in_main_chain) WHERE in_main_chain=1"
+#                )
+                await conn.execute("DROP INDEX IF EXISTS is_fully_compactified")
                 await conn.execute(
                     "CREATE INDEX IF NOT EXISTS main_chain ON full_blocks(height, in_main_chain) WHERE in_main_chain=1"
                 )

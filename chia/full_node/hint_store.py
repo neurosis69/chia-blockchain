@@ -21,7 +21,8 @@ class HintStore:
                 await conn.execute(
                     "CREATE TABLE IF NOT EXISTS hints(id INTEGER PRIMARY KEY AUTOINCREMENT, coin_id blob, hint blob)"
                 )
-            await conn.execute("CREATE INDEX IF NOT EXISTS hint_index on hints(hint)")
+#            await conn.execute("CREATE INDEX IF NOT EXISTS hint_index on hints(hint)")
+            await conn.execute("DROP INDEX IF EXISTS hint_index")
         return self
 
     async def get_coin_ids(self, hint: bytes) -> List[bytes32]:
