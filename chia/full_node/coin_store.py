@@ -8,13 +8,11 @@ from chia.types.blockchain_format.sized_bytes import bytes32
 from chia.types.coin_record import CoinRecord
 from chia.util.db_wrapper import DBWrapper2
 from chia.util.ints import uint32, uint64
-from chia.util.chunks import chunks
+from chia.util.chunks import chunks, SQLITE_MAX_VARIABLE_NUMBER
 import time
 import logging
 
 log = logging.getLogger(__name__)
-
-MAX_SQLITE_PARAMETERS = 900
 
 
 class CoinStore:
@@ -68,13 +66,17 @@ class CoinStore:
                 )
 
             # Useful for reorg lookups
-            await conn.execute("CREATE INDEX IF NOT EXISTS coin_confirmed_index on coin_record(confirmed_index)")
+#            await conn.execute("CREATE INDEX IF NOT EXISTS coin_confirmed_index on coin_record(confirmed_index)")
+            await conn.execute("DROP INDEX IF EXISTS coin_confirmed_index")
 
-            await conn.execute("CREATE INDEX IF NOT EXISTS coin_spent_index on coin_record(spent_index)")
+#            await conn.execute("CREATE INDEX IF NOT EXISTS coin_spent_index on coin_record(spent_index)")
+            await conn.execute("DROP INDEX IF EXISTS coin_spent_index")
 
-            await conn.execute("CREATE INDEX IF NOT EXISTS coin_puzzle_hash on coin_record(puzzle_hash)")
+#            await conn.execute("CREATE INDEX IF NOT EXISTS coin_puzzle_hash on coin_record(puzzle_hash)")
+            await conn.execute("DROP INDEX IF EXISTS coin_puzzle_hash")
 
-            await conn.execute("CREATE INDEX IF NOT EXISTS coin_parent_index on coin_record(coin_parent)")
+#            await conn.execute("CREATE INDEX IF NOT EXISTS coin_parent_index on coin_record(coin_parent)")
+            await conn.execute("DROP INDEX IF EXISTS coin_parent_index")
 
         return self
 
@@ -178,7 +180,7 @@ class CoinStore:
 
         async with self.db_wrapper.read_db() as conn:
             cursors: List[Cursor] = []
-            for names_chunk in chunks(names, MAX_SQLITE_PARAMETERS):
+            for names_chunk in chunks(names, SQLITE_MAX_VARIABLE_NUMBER):
                 names_db: Tuple[Any, ...]
                 if self.db_wrapper.db_version == 2:
                     names_db = tuple(names_chunk)
@@ -346,7 +348,7 @@ class CoinStore:
 
         coins = set()
         async with self.db_wrapper.read_db() as conn:
-            for puzzles in chunks(puzzle_hashes, MAX_SQLITE_PARAMETERS):
+            for puzzles in chunks(puzzle_hashes, SQLITE_MAX_VARIABLE_NUMBER):
                 puzzle_hashes_db: Tuple[Any, ...]
                 if self.db_wrapper.db_version == 2:
                     puzzle_hashes_db = tuple(puzzles)
@@ -378,7 +380,7 @@ class CoinStore:
 
         coins = set()
         async with self.db_wrapper.read_db() as conn:
-            for ids in chunks(parent_ids, MAX_SQLITE_PARAMETERS):
+            for ids in chunks(parent_ids, SQLITE_MAX_VARIABLE_NUMBER):
                 parent_ids_db: Tuple[Any, ...]
                 if self.db_wrapper.db_version == 2:
                     parent_ids_db = tuple(ids)
@@ -409,7 +411,7 @@ class CoinStore:
 
         coins = set()
         async with self.db_wrapper.read_db() as conn:
-            for ids in chunks(coin_ids, MAX_SQLITE_PARAMETERS):
+            for ids in chunks(coin_ids, SQLITE_MAX_VARIABLE_NUMBER):
                 coin_ids_db: Tuple[Any, ...]
                 if self.db_wrapper.db_version == 2:
                     coin_ids_db = tuple(ids)
@@ -519,22 +521,32 @@ class CoinStore:
     async def _set_spent(self, coin_names: List[bytes32], index: uint32):
 
         assert len(coin_names) == 0 or index > 0
-        updates = []
-        for coin_name in coin_names:
-            updates.append((index, self.maybe_to_hex(coin_name)))
 
         async with self.db_wrapper.write_db() as conn:
-            if self.db_wrapper.db_version == 2:
-                ret: Cursor = await conn.executemany(
-                    "UPDATE OR FAIL coin_record SET spent_index=? WHERE coin_name=? AND spent_index=0", updates
-                )
+            updates: List[Cursor] = []
+            for coin_names_chunk in chunks(coin_names, MAX_SQLITE_PARAMETERS):
+                if self.db_wrapper.db_version == 2:
+                    updates.append(
+                        await conn.execute(
+                            f"""
+                            UPDATE OR FAIL coin_record INDEXED BY sqlite_autoindex_coin_record_1
+                            SET spent_index={index}
+                            WHERE spent_index=0
+                            AND coin_name IN ({','.join(['?'] * len(coin_names_chunk))})
+                            """,
+                            coin_names_chunk,
+                        )
+                    )
 
-            else:
-                ret = await conn.executemany(
-                    "UPDATE OR FAIL coin_record SET spent=1,spent_index=? WHERE coin_name=? AND spent_index=0",
-                    updates,
-                )
-            if ret.rowcount != len(coin_names):
-                raise ValueError(
-                    f"Invalid operation to set spent, total updates {ret.rowcount} expected {len(coin_names)}"
-                )
+                else:
+                    updates.append(
+                        await conn.execute(
+                            f"""
+                            UPDATE OR FAIL coin_record INDEXED BY sqlite_autoindex_coin_record_1
+                            SET spent=1,spent_index={index}
+                            WHERE spent_index=0
+                            AND coin_name IN ({','.join(['?'] * len(coin_names_chunk))})
+                            """,
+                            coin_names_chunk,
+                        )
+                    )
