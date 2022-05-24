@@ -41,7 +41,6 @@ from tests.plot_sync.test_delta import dummy_plot
 from tests.setup_nodes import setup_harvester_farmer, test_constants
 from tests.time_out_assert import time_out_assert, time_out_assert_custom_interval
 from tests.util.rpc import validate_get_routes
-from tests.util.socket import find_available_listen_port
 
 log = logging.getLogger(__name__)
 
@@ -74,24 +73,21 @@ async def harvester_farmer_environment(bt, harvester_farmer_simulation, self_hos
     farmer_rpc_api = FarmerRpcApi(farmer_service._api.farmer)
     harvester_rpc_api = HarvesterRpcApi(harvester_service._node)
 
-    rpc_port_farmer = uint16(find_available_listen_port("farmer rpc"))
-    rpc_port_harvester = uint16(find_available_listen_port("harvester rpc"))
-
-    rpc_cleanup = await start_rpc_server(
+    rpc_cleanup, rpc_port_farmer = await start_rpc_server(
         farmer_rpc_api,
         hostname,
         daemon_port,
-        rpc_port_farmer,
+        uint16(0),
         stop_node_cb,
         bt.root_path,
         config,
         connect_to_daemon=False,
     )
-    rpc_cleanup_2 = await start_rpc_server(
+    rpc_cleanup_2, rpc_port_harvester = await start_rpc_server(
         harvester_rpc_api,
         hostname,
         daemon_port,
-        rpc_port_harvester,
+        uint16(0),
         stop_node_cb,
         bt.root_path,
         config,
@@ -547,3 +543,56 @@ async def test_farmer_get_harvester_plots_endpoints(
                 "total_count": total_count,
                 "plots": expected_plots,
             }
+
+
+@pytest.mark.asyncio
+async def test_harvester_add_plot_directory(harvester_farmer_environment) -> None:
+    (
+        farmer_service,
+        farmer_rpc_api,
+        farmer_rpc_client,
+        harvester_service,
+        harvester_rpc_api,
+        harvester_rpc_client,
+    ) = harvester_farmer_environment
+
+    async def assert_added(path: Path) -> None:
+        assert await harvester_rpc_client.add_plot_directory(str(path))
+        with lock_and_load_config(root_path, "config.yaml") as config:
+            assert str(path) in config["harvester"]["plot_directories"]
+
+    # Test without the required parameter: dirname
+    with pytest.raises(ValueError, match="dirname"):
+        await harvester_rpc_client.fetch("add_plot_directory", {})
+
+    root_path = harvester_service._node.root_path
+    test_path = Path(root_path / "test_path").resolve()
+
+    # The test_path doesn't exist at this point
+    with pytest.raises(ValueError, match=f"Path doesn't exist: {test_path}"):
+        await harvester_rpc_client.add_plot_directory(str(test_path))
+
+    # Create a file at the test_path and make sure it detects this
+    with open(test_path, "w"):
+        pass
+
+    with pytest.raises(ValueError, match=f"Path is not a directory: {test_path}"):
+        await harvester_rpc_client.add_plot_directory(str(test_path))
+
+    # Drop the file, make it a directory and make sure it gets added properly.
+    test_path.unlink()
+    mkdir(test_path)
+
+    await assert_added(test_path)
+
+    with pytest.raises(ValueError, match=f"Path already added: {test_path}"):
+        await harvester_rpc_client.add_plot_directory(str(test_path))
+
+    # Add another one and make sure they are still both there.
+    test_path_other = test_path / "other"
+    mkdir(test_path_other)
+    await assert_added(test_path_other)
+
+    added_directories = await harvester_rpc_client.get_plot_directories()
+    assert str(test_path) in added_directories
+    assert str(test_path_other) in added_directories
