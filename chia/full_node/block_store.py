@@ -96,9 +96,10 @@ class BlockStore:
 
                 # Height index so we can look up in order of height for sync purposes
                 await conn.execute("CREATE INDEX IF NOT EXISTS full_block_height on full_blocks(height)")
-                await conn.execute(
-                    "CREATE INDEX IF NOT EXISTS is_fully_compactified on full_blocks(is_fully_compactified)"
-                )
+#                await conn.execute(
+#                    "CREATE INDEX IF NOT EXISTS is_fully_compactified on full_blocks(is_fully_compactified)"
+#                )
+                await conn.execute("DROP INDEX IF EXISTS is_fully_compactified")
 
                 await conn.execute("CREATE INDEX IF NOT EXISTS height on block_records(height)")
 
