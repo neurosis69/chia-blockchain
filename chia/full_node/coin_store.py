@@ -175,9 +175,6 @@ class CoinStore:
 
         coins: List[CoinRecord] = []
 
-        if len(names) == 0:
-            return coins
-
         async with self.db_wrapper.read_db() as conn:
             cursors: List[Cursor] = []
             for names_chunk in chunks(names, SQLITE_MAX_VARIABLE_NUMBER):
@@ -521,6 +518,9 @@ class CoinStore:
     async def _set_spent(self, coin_names: List[bytes32], index: uint32):
 
         assert len(coin_names) == 0 or index > 0
+
+        if len(coin_names) == 0:
+            return
 
         async with self.db_wrapper.write_db() as conn:
             updates: List[Cursor] = []
