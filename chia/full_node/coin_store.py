@@ -524,7 +524,7 @@ class CoinStore:
 
         async with self.db_wrapper.write_db() as conn:
             updates: List[Cursor] = []
-            for coin_names_chunk in chunks(coin_names, MAX_SQLITE_PARAMETERS):
+            for coin_names_chunk in chunks(coin_names, SQLITE_MAX_VARIABLE_NUMBER):
                 if self.db_wrapper.db_version == 2:
                     updates.append(
                         await conn.execute(
