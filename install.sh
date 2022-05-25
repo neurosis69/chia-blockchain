@@ -145,22 +145,22 @@ if [ "$(uname)" = "Linux" ]; then
     echo "Installing on Ubuntu 20.*."
     sudo apt-get update
     sudo apt-get install -y python3.8-venv openssl
-    install_sqlite3
+    #install_sqlite3
   elif [ "$UBUNTU_21" = "1" ]; then
     echo "Installing on Ubuntu 21.*."
     sudo apt-get update
     sudo apt-get install -y python3.9-venv openssl
-    install_sqlite3
+    #install_sqlite3
   elif [ "$UBUNTU_22" = "1" ]; then
     echo "Installing on Ubuntu 22.* or newer."
     sudo apt-get update
     sudo apt-get install -y python3.10-venv openssl
-    install_sqlite3
+    #install_sqlite3
   elif [ "$DEBIAN" = "true" ]; then
     echo "Installing on Debian."
     sudo apt-get update
     sudo apt-get install -y python3-venv openssl
-    install_sqlite3
+    #install_sqlite3
   elif type pacman >/dev/null 2>&1 && [ -f "/etc/arch-release" ]; then
     # Arch Linux
     # Arch provides latest python version. User will need to manually install python 3.9 if it is not present
@@ -168,7 +168,7 @@ if [ "$(uname)" = "Linux" ]; then
     case $(uname -m) in
       x86_64|aarch64)
         sudo pacman ${PACMAN_AUTOMATED} -S --needed git openssl
-	install_sqlite3
+	#install_sqlite3
         ;;
       *)
         echo "Incompatible CPU architecture. Must be x86_64 or aarch64."
@@ -191,16 +191,16 @@ if [ "$(uname)" = "Linux" ]; then
     echo "Installing on Rocky."
     # TODO: make this smarter about getting the latest version
     sudo yum install --assumeyes python39 openssl
-    install_sqlite3
+    #install_sqlite3
   elif type yum >/dev/null 2>&1 && [ -f "/etc/redhat-release" ] || [ -f "/etc/fedora-release" ]; then
     # Redhat or Fedora
     echo "Installing on Redhat/Fedora."
     if ! command -v python3.9 >/dev/null 2>&1; then
       sudo yum install -y python39 openssl
-      install_sqlite3
+      #install_sqlite3
     fi
   else
-    install_sqlite3
+    #install_sqlite3
   fi
 elif [ "$(uname)" = "Darwin" ]; then
   echo "Installing on macOS."
