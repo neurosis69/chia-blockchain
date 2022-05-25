@@ -89,6 +89,7 @@ class WalletPuzzleStore:
             await self.db_wrapper.lock.acquire()
         try:
             sql_records = []
+            sql_records2 = []
             for record in records:
                 self.all_puzzle_hashes.add(record.puzzle_hash)
                 if record.hardened:
@@ -107,9 +108,14 @@ class WalletPuzzleStore:
                     ),
                 )
 
-            cursor = await self.db_connection.executemany(
-                "INSERT OR REPLACE INTO derivation_paths VALUES(?, ?, ?, ?, ?, ?, ?)",
-                sql_records,
+            for i in range(len(sql_records)):
+                sql_records2 += sql_records[i]
+
+            row_params = ",".join(["(?, ?, ?, ?, ?, ?, ?)"] * len(sql_records))
+
+            cursor = await self.db_connection.execute(
+                f"INSERT OR REPLACE INTO derivation_paths VALUES {row_params}",
+                sql_records2,
             )
 
             await cursor.close()
