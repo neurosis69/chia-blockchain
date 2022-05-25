@@ -470,6 +470,8 @@ class CoinStore:
     async def _add_coin_records(self, records: List[CoinRecord]) -> None:
 
         if self.db_wrapper.db_version == 2:
+            # only for test, columns per row * max(confirmed_index) is below SQLITE_MAX_VARIABLE_NUMBER
+            # So for testruns we would expect no problems with sqlite limit (if sqlite version is > 3.32
             values2 = []
             values3 = []
             for record in records:
