@@ -9,6 +9,7 @@ from chia.types.coin_record import CoinRecord
 from chia.util.db_wrapper import DBWrapper2, SQLITE_MAX_VARIABLE_NUMBER
 from chia.util.ints import uint32, uint64
 from chia.util.chunks import chunks
+import asyncio
 import time
 import logging
 
@@ -188,11 +189,11 @@ class CoinStore:
                     )
                 )
 
-            for cursor in cursors:
-                for row in await cursor.fetchall():
-                    coin = self.row_to_coin(row)
-                    record = CoinRecord(coin, row[0], row[1], row[2], row[6])
-                    coins.append(record)
+        for cursor in cursors:
+            for row in await cursor.fetchall():
+                coin = self.row_to_coin(row)
+                record = CoinRecord(coin, row[0], row[1], row[2], row[6])
+                coins.append(record)
 
         return coins
 
@@ -467,11 +468,7 @@ class CoinStore:
     async def _add_coin_records(self, records: List[CoinRecord]) -> None:
 
         if self.db_wrapper.db_version == 2:
-            # only for test, columns per row * max(confirmed_index) is below SQLITE_MAX_VARIABLE_NUMBER
-            # So for testruns we would expect no problems with sqlite limit (if sqlite version is > 3.32
-
             values2 = []
-            values3 = []
             for record in records:
                 values2.append(
                     (
@@ -485,16 +482,20 @@ class CoinStore:
                         record.timestamp,
                     )
                 )
-            for i in range(len(values2)):
-              values3 += values2[i]
-            #row_params = ",".join(["(?, ?, ?, ?, ?, ?, ?, ?)"] * len(values2))
-            row_params = ",".join(["(?, ?, ?, ?, ?, ?, ?, ?)"] * len(values2))
             if len(values2) > 0:
-                async with self.db_wrapper.write_db() as conn:
-                    await conn.execute(
-                        f"INSERT INTO coin_record VALUES {row_params}",
-                        values3,
-                    )
+                tasks: List[asyncio.Task] = []
+                try:
+                    async with self.db_wrapper.write_db() as conn:
+                        tasks.append(
+                            asyncio.create_task(
+                                conn.executemany(
+                                    "INSERT INTO coin_record VALUES(?, ?, ?, ?, ?, ?, ?, ?)",
+                                    values2,
+                                )
+                            )
+                        )
+                finally:
+                    await asyncio.wait(tasks)
         else:
             values = []
             for record in records:
@@ -526,29 +527,27 @@ class CoinStore:
         if len(coin_names) == 0:
             return
 
+        updates = []
+        for coin_name in coin_names:
+            updates.append((index, self.maybe_to_hex(coin_name)))
+
         async with self.db_wrapper.write_db() as conn:
-            rows_updated: int = 0
-            for coin_names_chunk in chunks(coin_names, SQLITE_MAX_VARIABLE_NUMBER):
-                name_params = ",".join(["?"] * len(coin_names_chunk))
-                if self.db_wrapper.db_version == 2:
-                    ret: Cursor = await conn.execute(
-                        f"UPDATE OR FAIL coin_record INDEXED BY sqlite_autoindex_coin_record_1 "
-                        f"SET spent_index={index} "
-                        f"WHERE spent_index=0 "
-                        f"AND coin_name IN ({name_params})",
-                        coin_names_chunk,
+            task: asyncio.Task
+            if self.db_wrapper.db_version == 2:
+                task = asyncio.create_task(
+                    conn.executemany(
+                        "UPDATE OR FAIL coin_record SET spent_index=? WHERE coin_name=? AND spent_index=0", updates
                     )
-                else:
-                    ret = await conn.execute(
-                        f"UPDATE OR FAIL coin_record INDEXED BY sqlite_autoindex_coin_record_1 "
-                        f"SET spent=1, spent_index={index} "
-                        f"WHERE spent_index=0 "
-                        f"AND coin_name IN ({name_params})",
-                        [name.hex() for name in coin_names_chunk],
-                    )
-                rows_updated += ret.rowcount
-            if rows_updated != len(coin_names):
-                raise ValueError(
-                    f"Invalid operation to set spent, total updates {rows_updated} expected {len(coin_names)}"
                 )
+
+            else:
+                task = asyncio.create_task(
+                    conn.executemany(
+                        "UPDATE OR FAIL coin_record SET spent=1,spent_index=? WHERE coin_name=? AND spent_index=0",
+                        updates,
+                    )
+                )
+        ret: Cursor = await task
+        if ret.rowcount != len(coin_names):
+            raise ValueError(f"Invalid operation to set spent, total updates {ret.rowcount} expected {len(coin_names)}")
 
