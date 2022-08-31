@@ -61,7 +61,7 @@ class WalletCoinStore:
         as_hexes = [cn.hex() for cn in coin_names]
         async with self.db_wrapper.reader_no_transaction() as conn:
             rows = await conn.execute_fetchall(
-                f'SELECT * from coin_record WHERE coin_name in ({"?," * (len(as_hexes) - 1)}?)', tuple(as_hexes)
+                f'SELECT confirmed_height, spent_height, spent, coinbase, puzzle_hash, coin_parent, amount, wallet_type, wallet_id from from coin_record WHERE coin_name in ({"?," * (len(as_hexes) - 1)}?)', tuple(as_hexes)
             )
 
         return [self.coin_record_from_row(row) for row in rows]
@@ -107,15 +107,15 @@ class WalletCoinStore:
             )
 
     def coin_record_from_row(self, row: sqlite3.Row) -> WalletCoinRecord:
-        coin = Coin(bytes32.fromhex(row[6]), bytes32.fromhex(row[5]), uint64.from_bytes(row[7]))
+        coin = Coin(bytes32.fromhex(row[5]), bytes32.fromhex(row[4]), uint64.from_bytes(row[6]))
         return WalletCoinRecord(
-            coin, uint32(row[1]), uint32(row[2]), bool(row[3]), bool(row[4]), WalletType(row[8]), row[9]
+            coin, uint32(row[0]), uint32(row[1]), bool(row[2]), bool(row[3]), WalletType(row[7]), row[8]
         )
 
     async def get_coin_record(self, coin_name: bytes32) -> Optional[WalletCoinRecord]:
         """Returns CoinRecord with specified coin id."""
         async with self.db_wrapper.reader_no_transaction() as conn:
-            rows = list(await conn.execute_fetchall("SELECT * from coin_record WHERE coin_name=?", (coin_name.hex(),)))
+            rows = list(await conn.execute_fetchall("SELECT confirmed_height, spent_height, spent, coinbase, puzzle_hash, coin_parent, amount, wallet_type, wallet_id from from coin_record WHERE coin_name=?", (coin_name.hex(),)))
 
         if len(rows) == 0:
             return None
@@ -126,7 +126,7 @@ class WalletCoinStore:
         async with self.db_wrapper.reader_no_transaction() as conn:
             rows = list(
                 await conn.execute_fetchall(
-                    f"SELECT * from coin_record WHERE coin_name in ({','.join('?'*len(coin_names))})",
+                    f"SELECT coin_name, confirmed_height, spent_height, spent, coinbase, puzzle_hash, coin_parent, amount, wallet_type, wallet_id from from coin_record WHERE coin_name in ({','.join('?'*len(coin_names))})",
                     [c.hex() for c in coin_names],
                 )
             )
@@ -153,7 +153,7 @@ class WalletCoinStore:
         """Returns set of CoinRecords that have not been spent yet for a wallet."""
         async with self.db_wrapper.reader_no_transaction() as conn:
             rows = await conn.execute_fetchall(
-                "SELECT * FROM coin_record WHERE wallet_id=? AND spent_height=0", (wallet_id,)
+                "SELECT confirmed_height, spent_height, spent, coinbase, puzzle_hash, coin_parent, amount, wallet_type, wallet_id from FROM coin_record WHERE wallet_id=? AND spent_height=0", (wallet_id,)
             )
         return set(self.coin_record_from_row(row) for row in rows)
 
@@ -174,7 +174,7 @@ class WalletCoinStore:
     async def get_coin_records_by_puzzle_hash(self, puzzle_hash: bytes32) -> List[WalletCoinRecord]:
         """Returns a list of all coin records with the given puzzle hash"""
         async with self.db_wrapper.reader_no_transaction() as conn:
-            rows = await conn.execute_fetchall("SELECT * from coin_record WHERE puzzle_hash=?", (puzzle_hash.hex(),))
+            rows = await conn.execute_fetchall("SELECT confirmed_height, spent_height, spent, coinbase, puzzle_hash, coin_parent, amount, wallet_type, wallet_id from from coin_record WHERE puzzle_hash=?", (puzzle_hash.hex(),))
 
         return [self.coin_record_from_row(row) for row in rows]
 
@@ -183,7 +183,7 @@ class WalletCoinStore:
         """Returns a list of all coin records with the given parent id"""
         async with self.db_wrapper.reader_no_transaction() as conn:
             rows = await conn.execute_fetchall(
-                "SELECT * from coin_record WHERE coin_parent=?", (parent_coin_info.hex(),)
+                "SELECT confirmed_height, spent_height, spent, coinbase, puzzle_hash, coin_parent, amount, wallet_type, wallet_id from from coin_record WHERE coin_parent=?", (parent_coin_info.hex(),)
             )
 
         return [self.coin_record_from_row(row) for row in rows]
