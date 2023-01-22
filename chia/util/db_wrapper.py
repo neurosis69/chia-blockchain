@@ -37,6 +37,9 @@ async def _create_connection(
     if log_file is not None:
         await connection.set_trace_callback(functools.partial(sql_trace_callback, file=log_file, name=name))
 
+    await self._connection.enable_load_extension(True)
+    await self._connection.execute(f"select load_extension('/home/chia/libchia/libchia.so')")
+
     return connection
 
 
