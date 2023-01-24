@@ -47,6 +47,8 @@ def backup_db(source_db: Path, backup_db: Path, *, no_indexes: bool) -> None:
     print(f"writing to backup file: {backup_db}")
     with closing(sqlite3.connect(source_db)) as in_db:
         try:
+            in_db.enable_load_extension(True)
+            in_db.execute(f"select load_extension('/home/chia/libchia/libchia.so')")
             if no_indexes:
                 in_db.execute("ATTACH DATABASE ? AS backup", (str(backup_db),))
                 in_db.execute("pragma backup.journal_mode=OFF")
