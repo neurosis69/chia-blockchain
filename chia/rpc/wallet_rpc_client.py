@@ -45,6 +45,12 @@ class WalletRpcClient(RpcClient):
         except ValueError as e:
             return e.args[0]
 
+    async def set_wallet_resync_on_startup(self, enable: bool = True) -> None:
+        return await self.fetch(
+            path="set_wallet_resync_on_startup",
+            request_json={"enable": enable},
+        )
+
     async def get_logged_in_fingerprint(self) -> int:
         return (await self.fetch("get_logged_in_fingerprint", {}))["fingerprint"]
 
@@ -635,6 +641,7 @@ class WalletRpcClient(RpcClient):
         exclude_amounts: Optional[List[uint64]] = None,
         exclude_coin_ids: Optional[List[str]] = None,
         additions: Optional[List[Dict[str, Any]]] = None,
+        removals: Optional[List[Coin]] = None,
     ) -> TransactionRecord:
         send_dict: Dict[str, Any] = {
             "wallet_id": wallet_id,
@@ -657,6 +664,8 @@ class WalletRpcClient(RpcClient):
             send_dict["additions"] = additions_hex
         else:
             raise ValueError("Must specify either amount and inner_address or additions")
+        if removals is not None and len(removals) > 0:
+            send_dict["coins"] = [c.to_json_dict() for c in removals]
         res = await self.fetch("cat_spend", send_dict)
         return TransactionRecord.from_json_dict_convenience(res["transaction"])
 
@@ -837,6 +846,11 @@ class WalletRpcClient(RpcClient):
             "fee": fee,
         }
         response = await self.fetch("nft_transfer_nft", request)
+        return response
+
+    async def count_nfts(self, wallet_id: Optional[int]):
+        request: Dict[str, Any] = {"wallet_id": wallet_id}
+        response = await self.fetch("nft_count_nfts", request)
         return response
 
     async def list_nfts(self, wallet_id):
@@ -1029,10 +1043,10 @@ class WalletRpcClient(RpcClient):
         )
         return TransactionRecord.from_json_dict_convenience(response["tx"])
 
-    async def sign_message_by_address(self, address: str, message: str) -> Tuple[str, str]:
+    async def sign_message_by_address(self, address: str, message: str) -> Tuple[str, str, str]:
         response = await self.fetch("sign_message_by_address", {"address": address, "message": message})
-        return response["pubkey"], response["signature"]
+        return response["pubkey"], response["signature"], response["signing_mode"]
 
-    async def sign_message_by_id(self, id: str, message: str) -> Tuple[str, str]:
+    async def sign_message_by_id(self, id: str, message: str) -> Tuple[str, str, str]:
         response = await self.fetch("sign_message_by_id", {"id": id, "message": message})
-        return response["pubkey"], response["signature"]
+        return response["pubkey"], response["signature"], response["signing_mode"]
