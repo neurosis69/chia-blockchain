@@ -1,34 +1,63 @@
-from typing import List
+from __future__ import annotations
 
-from blspy import G2Element
+from dataclasses import dataclass
+from typing import Dict, Optional, Tuple
 
-from chia.types.condition_opcodes import ConditionOpcode
-from chia.types.blockchain_format.program import INFINITE_COST
-from chia.types.coin_spend import CoinSpend
-from chia.full_node.mempool_check_conditions import get_name_puzzle_conditions
+from chia.consensus.condition_costs import ConditionCost
 from chia.consensus.default_constants import DEFAULT_CONSTANTS
-from chia.types.spend_bundle import SpendBundle
-from chia.full_node.bundle_tools import simple_solution_generator
+from chia.types.blockchain_format.coin import Coin
+from chia.types.blockchain_format.program import Program
+from chia.types.blockchain_format.sized_bytes import bytes32
+from chia.types.coin_spend import CoinSpend
+from chia.types.condition_opcodes import ConditionOpcode
+from chia.util.errors import Err, ValidationError
+from chia.util.ints import uint64
 
 
-def compute_coin_hints(cs: CoinSpend) -> List[bytes]:
+@dataclass(frozen=True)
+class HintedCoin:
+    coin: Coin
+    hint: Optional[bytes32]
 
-    bundle = SpendBundle([cs], G2Element())
-    generator = simple_solution_generator(bundle)
 
-    npc_result = get_name_puzzle_conditions(
-        generator,
-        INFINITE_COST,
-        cost_per_byte=DEFAULT_CONSTANTS.COST_PER_BYTE,
-        mempool_mode=False,
-        height=DEFAULT_CONSTANTS.SOFT_FORK_HEIGHT,
-    )
-    h_list = []
-    for npc in npc_result.npc_list:
-        for opcode, conditions in npc.conditions:
-            if opcode == ConditionOpcode.CREATE_COIN:
-                for condition in conditions:
-                    if len(condition.vars) > 2 and condition.vars[2] != b"":
-                        h_list.append(condition.vars[2])
+def compute_spend_hints_and_additions(
+    cs: CoinSpend,
+    *,
+    max_cost: int = DEFAULT_CONSTANTS.MAX_BLOCK_COST_CLVM,
+) -> Tuple[Dict[bytes32, HintedCoin], int]:
+    cost, result_program = cs.puzzle_reveal.run_with_cost(max_cost, cs.solution)
 
-    return h_list
+    hinted_coins: Dict[bytes32, HintedCoin] = {}
+    for condition in result_program.as_iter():
+        if cost > max_cost:
+            raise ValidationError(Err.BLOCK_COST_EXCEEDS_MAX, "compute_spend_hints_and_additions() for CoinSpend")
+        atoms = condition.as_iter()
+        op = next(atoms).atom
+        if op in [
+            ConditionOpcode.AGG_SIG_PARENT,
+            ConditionOpcode.AGG_SIG_PUZZLE,
+            ConditionOpcode.AGG_SIG_AMOUNT,
+            ConditionOpcode.AGG_SIG_PUZZLE_AMOUNT,
+            ConditionOpcode.AGG_SIG_PARENT_AMOUNT,
+            ConditionOpcode.AGG_SIG_PARENT_PUZZLE,
+            ConditionOpcode.AGG_SIG_UNSAFE,
+            ConditionOpcode.AGG_SIG_ME,
+        ]:
+            cost += ConditionCost.AGG_SIG.value
+            continue
+        if op != ConditionOpcode.CREATE_COIN.value:
+            continue
+        cost += ConditionCost.CREATE_COIN.value
+
+        coin: Coin = Coin(cs.coin.name(), bytes32(condition.at("rf").atom), uint64(condition.at("rrf").as_int()))
+        hint: Optional[bytes32] = None
+        if (
+            condition.at("rrr") != Program.to(None)  # There's more than two arguments
+            and condition.at("rrrf").atom is None  # The 3rd argument is a cons
+        ):
+            potential_hint: Optional[bytes] = condition.at("rrrff").atom
+            if potential_hint is not None and len(potential_hint) == 32:
+                hint = bytes32(potential_hint)
+        hinted_coins[bytes32(coin.name())] = HintedCoin(coin, hint)
+
+    return hinted_coins, cost

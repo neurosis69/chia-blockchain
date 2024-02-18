@@ -1,16 +1,18 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Optional, Dict
+from typing import Any, Dict, Optional
 
-from blspy import G1Element
+from chia_rs import G1Element
 
 from chia.protocols.pool_protocol import POOL_PROTOCOL_VERSION
 from chia.types.blockchain_format.coin import Coin
 from chia.types.blockchain_format.program import Program
 from chia.types.blockchain_format.sized_bytes import bytes32
 from chia.util.byte_types import hexstr_to_bytes
-from chia.util.ints import uint32, uint8
-from chia.util.streamable import streamable, Streamable
+from chia.util.ints import uint8, uint32
+from chia.util.streamable import Streamable, streamable
 
 
 class PoolSingletonState(IntEnum):
@@ -38,8 +40,8 @@ LEAVING_POOL = PoolSingletonState.LEAVING_POOL
 FARMING_TO_POOL = PoolSingletonState.FARMING_TO_POOL
 
 
-@dataclass(frozen=True)
 @streamable
+@dataclass(frozen=True)
 class PoolState(Streamable):
     """
     `PoolState` is a type that is serialized to the blockchain to track the state of the user's pool singleton
@@ -61,7 +63,11 @@ class PoolState(Streamable):
     relative_lock_height: uint32
 
 
-def initial_pool_state_from_dict(state_dict: Dict, owner_pubkey: G1Element, owner_puzzle_hash: bytes32) -> PoolState:
+def initial_pool_state_from_dict(
+    state_dict: Dict[str, Any],
+    owner_pubkey: G1Element,
+    owner_puzzle_hash: bytes32,
+) -> PoolState:
     state_str = state_dict["state"]
     singleton_state: PoolSingletonState = PoolSingletonState[state_str]
 
@@ -88,7 +94,7 @@ def create_pool_state(
     pool_url: Optional[str],
     relative_lock_height: uint32,
 ) -> PoolState:
-    if state not in set(s.value for s in PoolSingletonState):
+    if state not in {s.value for s in PoolSingletonState}:
         raise AssertionError("state {state} is not a valid PoolSingletonState,")
     ps = PoolState(
         POOL_PROTOCOL_VERSION, uint8(state), target_puzzle_hash, owner_pubkey, pool_url, relative_lock_height
@@ -97,8 +103,8 @@ def create_pool_state(
     return ps
 
 
-@dataclass(frozen=True)
 @streamable
+@dataclass(frozen=True)
 class PoolWalletInfo(Streamable):
     """
     Internal Pool Wallet state, not destined for the blockchain. This can be completely derived with
